@@ -6,7 +6,7 @@ from aris.core.config import Settings, load_dotenv
 from aris.core.agents import list_agents
 from aris.core.runner import run_agent
 from aris.core.ledger_cli import ledger_latest, ledger_show
-from aris.core.secrets_cli import secrets_check
+from aris.core.secrets_cli import secrets_check, secrets_set
 from aris.utils.logging import get_logger
 
 log = get_logger("aris.cli")
@@ -47,6 +47,9 @@ def main() -> int:
     chk = sec_sub.add_parser("check", help="check if secrets are available")
     chk.add_argument("names", nargs="+", help="secret env var names")
 
+    st = sec_sub.add_parser("set", help="store a secret (keyring backend)")
+    st.add_argument("name", help="secret name")
+
     args = p.parse_args()
 
     if args.cmd == "ping":
@@ -85,6 +88,8 @@ def main() -> int:
     if args.cmd == "secrets":
         if args.secrets_cmd == "check":
             return secrets_check(args.names)
+        if args.secrets_cmd == "set":
+            return secrets_set(args.name)
         p.print_help()
         return 1
 
