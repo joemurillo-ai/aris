@@ -6,7 +6,7 @@ from aris.core.secrets import get_secret
 
 def secrets_check(names: List[str]) -> int:
     load_dotenv()
-    settings = Settings()
+    settings = Settings.from_env()
     missing = 0
     for n in names:
         v = get_secret(n, settings)
@@ -19,7 +19,7 @@ def secrets_check(names: List[str]) -> int:
 
 def secrets_set(name: str) -> int:
     load_dotenv()
-    settings = Settings()
+    settings = Settings.from_env()
     backend = getattr(settings, "secrets_backend", "env")
     service = getattr(settings, "secrets_service", "aris")
 

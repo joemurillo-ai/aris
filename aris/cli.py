@@ -12,8 +12,8 @@ from aris.utils.logging import get_logger
 log = get_logger("aris.cli")
 
 def main() -> int:
-    load_dotenv()
-    settings = Settings()
+    load_dotenv(Path('.env'))
+    settings = Settings.from_env()
     logs_dir = Path(settings.logs_dir)
 
     p = argparse.ArgumentParser(prog="aris", description="ARIS CLI (Node 2)")
