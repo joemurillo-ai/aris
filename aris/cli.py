@@ -1,7 +1,20 @@
 import argparse
 from datetime import datetime
+from pathlib import Path
 
-def main():
+from aris.core.config import Settings, load_dotenv
+from aris.core.agents import list_agents
+from aris.core.runner import run_agent
+from aris.core.ledger_cli import ledger_latest, ledger_show
+from aris.utils.logging import get_logger
+
+log = get_logger("aris.cli")
+
+def main() -> int:
+    load_dotenv()
+    settings = Settings()
+    logs_dir = Path(settings.logs_dir)
+
     p = argparse.ArgumentParser(prog="aris", description="ARIS CLI (Node 2)")
     sub = p.add_subparsers(dest="cmd")
 
@@ -10,17 +23,57 @@ def main():
     hello = sub.add_parser("hello", help="greet")
     hello.add_argument("name", nargs="?", default="Operator")
 
+    sub.add_parser("agents", help="list available agents")
+
+    r = sub.add_parser("run", help="run an agent")
+    r.add_argument("agent", help="agent name (e.g., planner, echo)")
+    r.add_argument("prompt", nargs="+", help="prompt text")
+
+    pl = sub.add_parser("planner", help="shortcut: run planner agent")
+    pl.add_argument("prompt", nargs="+", help="prompt text")
+
+    led = sub.add_parser("ledger", help="inspect run ledger")
+    led_sub = led.add_subparsers(dest="ledger_cmd")
+
+    led_sub.add_parser("latest", help="print newest run_id")
+
+    show = led_sub.add_parser("show", help="pretty-print a ledger file by run_id")
+    show.add_argument("run_id", help="run id (filename without .json)")
+
     args = p.parse_args()
 
     if args.cmd == "ping":
         print("ARIS: ok")
-        return
+        return 0
 
     if args.cmd == "hello":
         print(f"[{datetime.now().isoformat(timespec='seconds')}] Hello, {args.name}. ARIS is online.")
-        return
+        return 0
+
+    if args.cmd == "agents":
+        for ag in list_agents():
+            print(f"- {ag.name}: {ag.description}")
+        return 0
+
+    if args.cmd == "run":
+        prompt = " ".join(args.prompt)
+        out = run_agent(prompt, args.agent, logs_dir=logs_dir)
+        print(out)
+        return 0
+
+    if args.cmd == "planner":
+        prompt = " ".join(args.prompt)
+        out = run_agent(prompt, "planner", logs_dir=logs_dir)
+        print(out)
+        return 0
+
+    if args.cmd == "ledger":
+        if args.ledger_cmd == "latest":
+            return ledger_latest(logs_dir)
+        if args.ledger_cmd == "show":
+            return ledger_show(args.run_id, logs_dir)
+        led.print_help()
+        return 1
 
     p.print_help()
-
-if __name__ == "__main__":
-    main()
+    return 1
