@@ -4,3 +4,14 @@
 
 # Virtualenv
 .venv/
+
+# Build artifacts
+*.egg-info/
+aris.egg-info/
+
+# Caches
+__pycache__/
+**/__pycache__/
+
+# Runtime
+logs/
