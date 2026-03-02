@@ -1,0 +1,4 @@
+services:
+  aris:
+    build: .
+    command: ["python", "aris/cli.py", "hello", "Joe from Docker"]
