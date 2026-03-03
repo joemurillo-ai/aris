@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 from aris.core.config import Settings, load_dotenv
+from aris.core.doctor import doctor as run_doctor
 from aris.core.agents import list_agents
 from aris.core.runner import run_agent
 from aris.core.ledger_cli import ledger_latest, ledger_show
@@ -20,6 +21,8 @@ def main() -> int:
     sub = p.add_subparsers(dest="cmd")
 
     sub.add_parser("ping", help="health check")
+    doctor_p = sub.add_parser("doctor", help="System integrity check")
+    doctor_p.add_argument("--env", default=".env", help="Path to .env (default: .env)")
 
     hello = sub.add_parser("hello", help="greet")
     hello.add_argument("name", nargs="?", default="Operator")
@@ -55,6 +58,11 @@ def main() -> int:
     if args.cmd == "ping":
         print("ARIS: ok")
         return 0
+    if args.cmd == "doctor":
+        report = run_doctor(Path(args.env))
+        for line in report.lines:
+            print(line)
+        return 0 if report.ok else 1
 
     if args.cmd == "hello":
         print(f"[{datetime.now().isoformat(timespec='seconds')}] Hello, {args.name}. ARIS is online.")
