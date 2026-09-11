@@ -23,6 +23,8 @@ class Mission:
     created_at: str = field(default_factory=_utc_iso)
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
+    failed_at: Optional[str] = None
+    failure_reason: Optional[str] = None
 
     def mark_running(self) -> None:
         self.status = "running"
@@ -34,3 +36,10 @@ class Mission:
         if self.started_at is None:
             self.started_at = _utc_iso()
         self.completed_at = _utc_iso()
+
+    def mark_failed(self, reason: str) -> None:
+        self.status = "failed"
+        if self.started_at is None:
+            self.started_at = _utc_iso()
+        self.failed_at = _utc_iso()
+        self.failure_reason = reason

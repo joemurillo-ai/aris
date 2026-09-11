@@ -25,99 +25,105 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
     mission_registry.save(mission_record)
     mission_id = mission_record.mission_id
 
-    plan = run_agent(
-        mission,
-        "planner",
-        logs_dir=logs_dir,
-        mission_id=mission_id,
-    )
+    try:
+        plan = run_agent(
+            mission,
+            "planner",
+            logs_dir=logs_dir,
+            mission_id=mission_id,
+        )
 
-    analysis = run_agent(
-        (
-            f"MISSION:\n{mission}\n\n"
-            f"PLANNER OUTPUT:\n{plan}\n\n"
-            "Produce a rigorous analysis of this mission."
-        ),
-        "analyst",
-        logs_dir=logs_dir,
-        mission_id=mission_id,
-    )
-
-    critique = run_agent(
-        (
-            f"MISSION:\n{mission}\n\n"
-            f"PLANNER OUTPUT:\n{plan}\n\n"
-            f"ANALYST OUTPUT:\n{analysis}\n\n"
-            "Review this analysis adversarially."
-        ),
-        "critic",
-        logs_dir=logs_dir,
-        mission_id=mission_id,
-    )
-
-    verdict = _extract_verdict(critique)
-
-    revised_analysis = None
-    final_critique = critique
-    final_verdict = verdict
-
-    if verdict == "REVISE":
-        revised_analysis = run_agent(
+        analysis = run_agent(
             (
                 f"MISSION:\n{mission}\n\n"
                 f"PLANNER OUTPUT:\n{plan}\n\n"
-                f"ORIGINAL ANALYSIS:\n{analysis}\n\n"
-                f"CRITIC FEEDBACK:\n{critique}\n\n"
-                "Revise the analysis to address the critic's feedback. "
-                "Preserve strong reasoning, correct weaknesses, and do not "
-                "invent facts."
+                "Produce a rigorous analysis of this mission."
             ),
             "analyst",
             logs_dir=logs_dir,
             mission_id=mission_id,
         )
 
-        final_critique = run_agent(
+        critique = run_agent(
             (
                 f"MISSION:\n{mission}\n\n"
                 f"PLANNER OUTPUT:\n{plan}\n\n"
-                f"REVISED ANALYST OUTPUT:\n{revised_analysis}\n\n"
-                "Review the revised analysis adversarially. "
-                "End with PASS, REVISE, or FAIL."
+                f"ANALYST OUTPUT:\n{analysis}\n\n"
+                "Review this analysis adversarially."
             ),
             "critic",
             logs_dir=logs_dir,
             mission_id=mission_id,
         )
 
-        final_verdict = _extract_verdict(final_critique)
+        verdict = _extract_verdict(critique)
 
-    sections = [
-        "=== ARIS REVIEW CHAIN ===",
-        f"MISSION ID: {mission_id}",
-        f"FINAL VERDICT: {final_verdict}",
-        "",
-        "=== PLAN ===",
-        plan,
-        "",
-        "=== ANALYSIS ===",
-        analysis,
-        "",
-        "=== CRITIQUE ===",
-        critique,
-    ]
+        revised_analysis = None
+        final_critique = critique
+        final_verdict = verdict
 
-    if revised_analysis is not None:
-        sections.extend([
+        if verdict == "REVISE":
+            revised_analysis = run_agent(
+                (
+                    f"MISSION:\n{mission}\n\n"
+                    f"PLANNER OUTPUT:\n{plan}\n\n"
+                    f"ORIGINAL ANALYSIS:\n{analysis}\n\n"
+                    f"CRITIC FEEDBACK:\n{critique}\n\n"
+                    "Revise the analysis to address the critic's feedback. "
+                    "Preserve strong reasoning, correct weaknesses, and do not "
+                    "invent facts."
+                ),
+                "analyst",
+                logs_dir=logs_dir,
+                mission_id=mission_id,
+            )
+
+            final_critique = run_agent(
+                (
+                    f"MISSION:\n{mission}\n\n"
+                    f"PLANNER OUTPUT:\n{plan}\n\n"
+                    f"REVISED ANALYST OUTPUT:\n{revised_analysis}\n\n"
+                    "Review the revised analysis adversarially. "
+                    "End with PASS, REVISE, or FAIL."
+                ),
+                "critic",
+                logs_dir=logs_dir,
+                mission_id=mission_id,
+            )
+
+            final_verdict = _extract_verdict(final_critique)
+
+        sections = [
+            "=== ARIS REVIEW CHAIN ===",
+            f"MISSION ID: {mission_id}",
+            f"FINAL VERDICT: {final_verdict}",
             "",
-            "=== REVISED ANALYSIS ===",
-            revised_analysis,
+            "=== PLAN ===",
+            plan,
             "",
-            "=== FINAL CRITIQUE ===",
-            final_critique,
-        ])
+            "=== ANALYSIS ===",
+            analysis,
+            "",
+            "=== CRITIQUE ===",
+            critique,
+        ]
 
-    mission_record.mark_completed()
-    mission_registry.save(mission_record)
+        if revised_analysis is not None:
+            sections.extend([
+                "",
+                "=== REVISED ANALYSIS ===",
+                revised_analysis,
+                "",
+                "=== FINAL CRITIQUE ===",
+                final_critique,
+            ])
 
-    return "\n".join(sections)
+        mission_record.mark_completed()
+        mission_registry.save(mission_record)
+
+        return "\n".join(sections)
+
+    except Exception as exc:
+        mission_record.mark_failed(str(exc))
+        mission_registry.save(mission_record)
+        raise
