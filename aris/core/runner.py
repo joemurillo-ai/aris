@@ -1,6 +1,7 @@
 import socket
 import time
 from pathlib import Path
+from typing import Optional
 
 from .agents import get_agent
 from .ledger import RunLedger
@@ -10,12 +11,19 @@ from aris.utils.logging import get_logger
 log = get_logger("aris.runner")
 
 
-def run_agent(prompt: str, agent_name: str, logs_dir: Path) -> str:
+def run_agent(
+    prompt: str,
+    agent_name: str,
+    logs_dir: Path,
+    mission_id: Optional[str] = None,
+) -> str:
     ledger = RunLedger(logs_dir)
+
     rec = ledger.start(
         cmd="run",
         input_text=prompt,
         agent=agent_name,
+        mission_id=mission_id,
         meta={
             "node_id": socket.gethostname(),
         },
@@ -25,12 +33,16 @@ def run_agent(prompt: str, agent_name: str, logs_dir: Path) -> str:
 
     try:
         agent = get_agent(agent_name)
+
         log.info(
             "agent_start",
             extra={
                 "event": "agent_start",
                 "run_id": rec.run_id,
-                "ctx": {"agent": agent_name},
+                "ctx": {
+                    "agent": agent_name,
+                    "mission_id": mission_id,
+                },
             },
         )
 
@@ -53,9 +65,13 @@ def run_agent(prompt: str, agent_name: str, logs_dir: Path) -> str:
             extra={
                 "event": "agent_ok",
                 "run_id": rec.run_id,
-                "ctx": {"agent": agent_name},
+                "ctx": {
+                    "agent": agent_name,
+                    "mission_id": mission_id,
+                },
             },
         )
+
         return out
 
     except Exception as e:
@@ -64,13 +80,18 @@ def run_agent(prompt: str, agent_name: str, logs_dir: Path) -> str:
         )
 
         ledger.fail(rec, str(e))
+
         log.error(
             "agent_error",
             extra={
                 "event": "agent_error",
                 "run_id": rec.run_id,
-                "ctx": {"agent": agent_name},
+                "ctx": {
+                    "agent": agent_name,
+                    "mission_id": mission_id,
+                },
             },
             exc_info=True,
         )
+
         raise
