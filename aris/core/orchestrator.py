@@ -7,9 +7,9 @@ from aris.core.runner import run_agent
 
 def _extract_verdict(text: str) -> str:
     match = re.search(
-        r"\b(PASS|REVISE|FAIL)\b",
+        r"^ARIS_VERDICT:\s*(PASS|REVISE|FAIL)\s*$",
         text,
-        flags=re.IGNORECASE,
+        flags=re.IGNORECASE | re.MULTILINE,
     )
     if not match:
         return "UNKNOWN"

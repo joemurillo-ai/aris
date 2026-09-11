@@ -45,7 +45,9 @@ def _critic(prompt: str) -> LLMResult:
             "missing evidence, blind spots, overconfidence, contradictions, "
             "security or safety risks, and weak recommendations. "
             "Do not merely restate the analysis. Challenge it. "
-            "End with a concise verdict: PASS, REVISE, or FAIL."
+            "At the very end, output exactly one machine-readable line in this format: "
+            "ARIS_VERDICT: PASS, ARIS_VERDICT: REVISE, or ARIS_VERDICT: FAIL. "
+            "Do not use those verdict words elsewhere in the response."
         ),
     )
 
