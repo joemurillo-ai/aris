@@ -21,6 +21,8 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
     mission_record = Mission(objective=mission)
     mission_registry = MissionRegistry(logs_dir / "missions")
     mission_registry.save(mission_record)
+    mission_record.mark_running()
+    mission_registry.save(mission_record)
     mission_id = mission_record.mission_id
 
     plan = run_agent(
@@ -114,5 +116,8 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
             "=== FINAL CRITIQUE ===",
             final_critique,
         ])
+
+    mission_record.mark_completed()
+    mission_registry.save(mission_record)
 
     return "\n".join(sections)
