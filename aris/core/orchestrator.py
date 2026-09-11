@@ -3,6 +3,7 @@ from pathlib import Path
 
 from aris.core.runner import run_agent
 from aris.core.mission import Mission
+from aris.core.mission_registry import MissionRegistry
 
 
 def _extract_verdict(text: str) -> str:
@@ -18,6 +19,8 @@ def _extract_verdict(text: str) -> str:
 
 def run_review_chain(mission: str, logs_dir: Path) -> str:
     mission_record = Mission(objective=mission)
+    mission_registry = MissionRegistry(logs_dir / "missions")
+    mission_registry.save(mission_record)
     mission_id = mission_record.mission_id
 
     plan = run_agent(
