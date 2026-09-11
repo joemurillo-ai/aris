@@ -16,7 +16,6 @@ def _echo(prompt: str) -> str:
 
 
 def _planner(prompt: str) -> str:
-    # Deterministic control-path planner.
     return "\n".join([
         "PLAN:",
         f"1) Clarify objective: {prompt}",
@@ -37,10 +36,25 @@ def _analyst(prompt: str) -> LLMResult:
     )
 
 
+def _critic(prompt: str) -> LLMResult:
+    return generate(
+        prompt,
+        system=(
+            "You are ARIS Critic, an adversarial review agent. "
+            "Evaluate the supplied analysis for unsupported assumptions, "
+            "missing evidence, blind spots, overconfidence, contradictions, "
+            "security or safety risks, and weak recommendations. "
+            "Do not merely restate the analysis. Challenge it. "
+            "End with a concise verdict: PASS, REVISE, or FAIL."
+        ),
+    )
+
+
 REGISTRY: Dict[str, Agent] = {
     "echo": Agent("echo", "Simple echo agent (dev smoke test).", _echo),
     "planner": Agent("planner", "Deterministic planning stub (no LLM).", _planner),
     "analyst": Agent("analyst", "LLM-backed analytical reasoning agent.", _analyst),
+    "critic": Agent("critic", "Adversarial review and challenge agent.", _critic),
 }
 
 

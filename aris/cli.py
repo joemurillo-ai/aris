@@ -7,6 +7,7 @@ from aris.core.doctor import doctor as run_doctor
 from aris.core.smoke import smoke as run_smoke
 from aris.core.agents import list_agents
 from aris.core.runner import run_agent
+from aris.core.orchestrator import run_review_chain
 from aris.core.ledger_cli import ledger_latest, ledger_show
 from aris.core.secrets_cli import secrets_check, secrets_set
 from aris.utils.logging import get_logger
@@ -39,6 +40,9 @@ def main() -> int:
     r = sub.add_parser("run", help="run an agent")
     r.add_argument("agent", help="agent name (e.g., planner, echo)")
     r.add_argument("prompt", nargs="+", help="prompt text")
+
+    review = sub.add_parser("review", help="run planner -> analyst -> critic chain")
+    review.add_argument("prompt", nargs="+", help="mission text")
 
     pl = sub.add_parser("planner", help="shortcut: run planner agent")
     pl.add_argument("prompt", nargs="+", help="prompt text")
@@ -88,6 +92,12 @@ def main() -> int:
     if args.cmd == "run":
         prompt = " ".join(args.prompt)
         out = run_agent(prompt, args.agent, logs_dir=logs_dir)
+        print(out)
+        return 0
+
+    if args.cmd == "review":
+        mission = " ".join(args.prompt)
+        out = run_review_chain(mission, logs_dir=logs_dir)
         print(out)
         return 0
 
