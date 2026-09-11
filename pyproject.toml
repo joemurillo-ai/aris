@@ -9,7 +9,7 @@ description = "ARIS (Analysis • Reasoning • Intelligence • Strategy) - Nod
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "Joe Murillo" }]
-dependencies = ["python-dotenv>=1.0"]
+dependencies = ["python-dotenv>=1.0", "openai>=3.11.0"]
 
 [project.optional-dependencies]
 dev = [
