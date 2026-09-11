@@ -1,8 +1,8 @@
 import re
-import uuid
 from pathlib import Path
 
 from aris.core.runner import run_agent
+from aris.core.mission import Mission
 
 
 def _extract_verdict(text: str) -> str:
@@ -17,7 +17,8 @@ def _extract_verdict(text: str) -> str:
 
 
 def run_review_chain(mission: str, logs_dir: Path) -> str:
-    mission_id = uuid.uuid4().hex[:12]
+    mission_record = Mission(objective=mission)
+    mission_id = mission_record.mission_id
 
     plan = run_agent(
         mission,
