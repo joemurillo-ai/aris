@@ -34,3 +34,18 @@ def test_completed_mission_cannot_run_again():
         match="Mission cannot run from status: completed",
     ):
         mission.mark_running()
+
+
+def test_quarantined_mission_cannot_run():
+    mission = Mission("quarantined mission")
+    mission.quarantine("joe", "manual containment")
+
+    assert mission.status == "quarantined"
+    assert mission.quarantine_actor == "joe"
+    assert mission.quarantine_reason == "manual containment"
+
+    with pytest.raises(
+        ValueError,
+        match="Mission cannot run from status: quarantined",
+    ):
+        mission.mark_running()

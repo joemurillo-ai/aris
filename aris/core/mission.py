@@ -33,6 +33,10 @@ class Mission:
     approval_actor: Optional[str] = None
     approval_reason: Optional[str] = None
 
+    quarantined_at: Optional[str] = None
+    quarantine_actor: Optional[str] = None
+    quarantine_reason: Optional[str] = None
+
     def request_approval(self) -> None:
         self.requires_approval = True
         self.approval_status = "pending"
@@ -62,13 +66,32 @@ class Mission:
         self.approval_reason = reason
         self.status = "denied"
 
+    def quarantine(
+        self,
+        actor: str,
+        reason: Optional[str] = None,
+    ) -> None:
+        if self.status not in {
+            "created",
+            "awaiting_approval",
+            "approved",
+        }:
+            raise ValueError(
+                f"Mission cannot be quarantined from status: {self.status}"
+            )
+
+        self.status = "quarantined"
+        self.quarantined_at = _utc_iso()
+        self.quarantine_actor = actor
+        self.quarantine_reason = reason
+
     def mark_running(self) -> None:
         if self.requires_approval and self.approval_status != "approved":
             raise ValueError(
                 "Mission requires approval before execution"
             )
 
-        if self.status in {"denied", "completed", "failed"}:
+        if self.status in {"denied", "quarantined", "completed", "failed"}:
             raise ValueError(
                 f"Mission cannot run from status: {self.status}"
             )

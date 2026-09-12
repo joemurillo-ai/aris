@@ -208,6 +208,13 @@ def missions_show(mission_id: str, logs_dir: Path) -> int:
     print(f"{'Reason':<18}{mission.approval_reason or '-'}")
 
     print()
+    print("QUARANTINE")
+    print(_rule())
+    print(f"{'Quarantined':<18}{_format_time(mission.quarantined_at)}")
+    print(f"{'Actor':<18}{mission.quarantine_actor or '-'}")
+    print(f"{'Reason':<18}{mission.quarantine_reason or '-'}")
+
+    print()
     print("AUTHORIZED AGENTS")
     print(_rule())
     for agent in mission.allowed_agents:
@@ -311,6 +318,35 @@ def missions_deny(
 
     if mission.approval_reason:
         print(f"Reason: {mission.approval_reason}")
+
+    return 0
+
+def missions_quarantine(
+    mission_id: str,
+    actor: str,
+    reason: Optional[str],
+    logs_dir: Path,
+) -> int:
+    registry = MissionRegistry(logs_dir / "missions")
+    mission = registry.get(mission_id)
+
+    if mission is None:
+        print(f"Mission not found: {mission_id}")
+        return 1
+
+    try:
+        mission.quarantine(actor, reason)
+    except ValueError as exc:
+        print(f"Quarantine blocked: {exc}")
+        return 1
+
+    registry.save(mission)
+
+    print(f"Mission quarantined: {mission.mission_id}")
+    print(f"Actor: {mission.quarantine_actor}")
+
+    if mission.quarantine_reason:
+        print(f"Reason: {mission.quarantine_reason}")
 
     return 0
 
