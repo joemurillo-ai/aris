@@ -10,7 +10,7 @@ from aris.core.runner import run_agent
 from aris.core.orchestrator import run_review_chain
 from aris.core.ledger_cli import ledger_latest, ledger_show
 from aris.core.secrets_cli import secrets_check, secrets_set
-from aris.core.missions_cli import missions_list, missions_show, missions_approve, missions_deny, missions_quarantine, missions_release
+from aris.core.missions_cli import missions_list, missions_show, missions_approve, missions_deny, missions_quarantine, missions_release, missions_retry
 from aris.utils.logging import get_logger
 
 log = get_logger("aris.cli")
@@ -120,6 +120,21 @@ def main() -> int:
         help="optional release reason",
     )
 
+    mission_retry = missions_sub.add_parser(
+        "retry",
+        help="create a new retry attempt from an eligible mission",
+    )
+    mission_retry.add_argument("mission_id", help="mission id")
+    mission_retry.add_argument(
+        "--actor",
+        required=True,
+        help="operator creating the retry",
+    )
+    mission_retry.add_argument(
+        "--reason",
+        help="optional retry reason",
+    )
+
     sec = sub.add_parser("secrets", help="secret utilities")
     sec_sub = sec.add_subparsers(dest="secrets_cmd")
 
@@ -207,6 +222,13 @@ def main() -> int:
             )
         if args.missions_cmd == "release":
             return missions_release(
+                args.mission_id,
+                args.actor,
+                args.reason,
+                logs_dir,
+            )
+        if args.missions_cmd == "retry":
+            return missions_retry(
                 args.mission_id,
                 args.actor,
                 args.reason,

@@ -17,6 +17,11 @@ class Mission:
     status: str = "created"
     risk_level: str = "medium"
     requires_approval: bool = False
+
+    retry_of: Optional[str] = None
+    attempt: int = 1
+    retry_actor: Optional[str] = None
+    retry_reason: Optional[str] = None
     allowed_agents: List[str] = field(
         default_factory=lambda: ["planner", "analyst", "critic"]
     )
@@ -123,6 +128,37 @@ class Mission:
         self.released_at = _utc_iso()
         self.release_actor = actor
         self.release_reason = reason
+
+    def new_retry(
+        self,
+        actor: str,
+        reason: Optional[str] = None,
+    ) -> "Mission":
+        if self.status not in {
+            "failed",
+            "created",
+            "approved",
+        }:
+            raise ValueError(
+                f"Mission cannot be retried from status: {self.status}"
+            )
+
+        retry = Mission(
+            objective=self.objective,
+            risk_level=self.risk_level,
+            requires_approval=self.requires_approval,
+            allowed_agents=list(self.allowed_agents),
+            retry_of=self.mission_id,
+            attempt=self.attempt + 1,
+            retry_actor=actor,
+            retry_reason=reason,
+        )
+
+        if self.requires_approval:
+            retry.approval_status = "approved"
+            retry.status = "approved"
+
+        return retry
 
     def mark_running(self) -> None:
         if self.requires_approval and self.approval_status != "approved":

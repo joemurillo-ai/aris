@@ -222,6 +222,14 @@ def missions_show(mission_id: str, logs_dir: Path) -> int:
     print(f"{'Reason':<18}{mission.release_reason or '-'}")
 
     print()
+    print("RETRY")
+    print(_rule())
+    print(f"{'Attempt':<18}{mission.attempt}")
+    print(f"{'Retry Of':<18}{mission.retry_of or '-'}")
+    print(f"{'Actor':<18}{mission.retry_actor or '-'}")
+    print(f"{'Reason':<18}{mission.retry_reason or '-'}")
+
+    print()
     print("AUTHORIZED AGENTS")
     print(_rule())
     for agent in mission.allowed_agents:
@@ -384,6 +392,38 @@ def missions_release(
 
     if mission.release_reason:
         print(f"Reason: {mission.release_reason}")
+
+    return 0
+
+def missions_retry(
+    mission_id: str,
+    actor: str,
+    reason: Optional[str],
+    logs_dir: Path,
+) -> int:
+    registry = MissionRegistry(logs_dir / "missions")
+    mission = registry.get(mission_id)
+
+    if mission is None:
+        print(f"Mission not found: {mission_id}")
+        return 1
+
+    try:
+        retry = mission.new_retry(actor, reason)
+    except ValueError as exc:
+        print(f"Retry blocked: {exc}")
+        return 1
+
+    registry.save(retry)
+
+    print(f"Retry created: {retry.mission_id}")
+    print(f"Retry of: {retry.retry_of}")
+    print(f"Attempt: {retry.attempt}")
+    print(f"Status: {retry.status}")
+    print(f"Actor: {retry.retry_actor}")
+
+    if retry.retry_reason:
+        print(f"Reason: {retry.retry_reason}")
 
     return 0
 

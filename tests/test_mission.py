@@ -73,3 +73,20 @@ def test_quarantined_approved_mission_can_be_released():
     assert mission.status == "approved"
     assert mission.release_actor == "joe"
     assert mission.release_reason == "containment cleared"
+
+
+def test_retry_creates_new_mission_with_lineage():
+    original = Mission("retry lineage")
+    original.mark_failed("simulated failure")
+
+    retry = original.new_retry(
+        "joe",
+        "operator requested retry",
+    )
+
+    assert retry.mission_id != original.mission_id
+    assert retry.retry_of == original.mission_id
+    assert retry.attempt == 2
+    assert retry.retry_actor == "joe"
+    assert retry.retry_reason == "operator requested retry"
+    assert retry.status == "created"
