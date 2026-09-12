@@ -1,0 +1,197 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from pathlib import Path
+import json
+from typing import Optional
+
+from aris.core.mission import Mission
+from aris.core.mission_registry import MissionRegistry
+
+
+WIDTH = 72
+
+
+def _rule() -> str:
+    return "─" * WIDTH
+
+
+def _parse_iso(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+    return datetime.fromisoformat(value)
+
+
+def _duration(mission: Mission) -> str:
+    start = _parse_iso(mission.started_at)
+    end = _parse_iso(mission.completed_at or mission.failed_at)
+
+    if not start:
+        return "-"
+
+    if end is None:
+        end = datetime.now(timezone.utc)
+
+    seconds = max(0, int((end - start).total_seconds()))
+
+    if seconds < 60:
+        return f"{seconds}s"
+
+    minutes, seconds = divmod(seconds, 60)
+
+    if minutes < 60:
+        return f"{minutes}m {seconds}s"
+
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes}m"
+
+
+def _format_time(value: Optional[str]) -> str:
+    dt = _parse_iso(value)
+    if dt is None:
+        return "-"
+    return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+
+def _mission_runs(mission_id: str, logs_dir: Path) -> list[dict]:
+    runs = []
+
+    for path in logs_dir.glob("*.json"):
+        try:
+            data = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        if data.get("mission_id") == mission_id:
+            runs.append(data)
+
+    return sorted(
+        runs,
+        key=lambda item: item.get("ts_start") or "",
+    )
+
+def missions_list(logs_dir: Path) -> int:
+    registry = MissionRegistry(logs_dir / "missions")
+    missions = registry.list()
+
+    print("ARIS MISSION CONTROL")
+    print(_rule())
+
+    if not missions:
+        print("No missions found.")
+        return 0
+
+    print(
+        f"{'MISSION ID':<14}"
+        f"{'STATUS':<13}"
+        f"{'RISK':<10}"
+        f"{'APPROVAL':<12}"
+        f"{'DURATION':<12}"
+    )
+    print(_rule())
+
+    for mission in sorted(
+        missions,
+        key=lambda item: item.created_at,
+        reverse=True,
+    ):
+        approval = "required" if mission.requires_approval else "no"
+
+        print(
+            f"{mission.mission_id:<14}"
+            f"{mission.status.upper():<13}"
+            f"{mission.risk_level.upper():<10}"
+            f"{approval.upper():<12}"
+            f"{_duration(mission):<12}"
+        )
+
+    return 0
+
+
+def missions_show(mission_id: str, logs_dir: Path) -> int:
+    registry = MissionRegistry(logs_dir / "missions")
+    mission = registry.get(mission_id)
+
+    if mission is None:
+        print(f"Mission not found: {mission_id}")
+        return 1
+
+    print("ARIS MISSION")
+    print(_rule())
+    print(f"{'Mission ID':<18}{mission.mission_id}")
+    print(f"{'Status':<18}{mission.status.upper()}")
+    print(f"{'Risk':<18}{mission.risk_level.upper()}")
+    print(
+        f"{'Approval':<18}"
+        f"{'REQUIRED' if mission.requires_approval else 'NOT REQUIRED'}"
+    )
+    print(f"{'Duration':<18}{_duration(mission)}")
+
+    print()
+    print("OBJECTIVE")
+    print(_rule())
+    print(mission.objective)
+
+    print()
+    print("TIMELINE")
+    print(_rule())
+    print(f"{'Created':<18}{_format_time(mission.created_at)}")
+    print(f"{'Started':<18}{_format_time(mission.started_at)}")
+    print(f"{'Completed':<18}{_format_time(mission.completed_at)}")
+    print(f"{'Failed':<18}{_format_time(mission.failed_at)}")
+
+    print()
+    print("AUTHORIZED AGENTS")
+    print(_rule())
+    for agent in mission.allowed_agents:
+        print(f"• {agent}")
+
+    runs = _mission_runs(mission_id, logs_dir)
+
+    print()
+    print("RUN HISTORY")
+    print(_rule())
+
+    if not runs:
+        print("No correlated runs found.")
+    else:
+        print(
+            f"{'RUN ID':<14}"
+            f"{'AGENT':<11}"
+            f"{'STATUS':<10}"
+            f"{'MODEL':<18}"
+            f"{'TOKENS':<10}"
+            f"{'LATENCY':<10}"
+        )
+        print(_rule())
+
+        for run in runs:
+            meta = run.get("meta") or {}
+            model = meta.get("model") or "deterministic"
+            tokens = meta.get("total_tokens")
+            latency_ms = meta.get("latency_ms")
+
+            token_text = str(tokens) if tokens is not None else "-"
+            latency_text = (
+                f"{latency_ms}ms"
+                if latency_ms is not None
+                else "-"
+            )
+
+            print(
+                f"{run.get('run_id', '-'):<14}"
+                f"{str(run.get('agent') or '-'):<11}"
+                f"{str(run.get('status') or '-').upper():<10}"
+                f"{str(model):<18}"
+                f"{token_text:<10}"
+                f"{latency_text:<10}"
+            )
+
+    if mission.failure_reason:
+        print()
+        print("FAILURE")
+        print(_rule())
+        print(mission.failure_reason)
+
+    return 0

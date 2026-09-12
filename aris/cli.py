@@ -10,6 +10,7 @@ from aris.core.runner import run_agent
 from aris.core.orchestrator import run_review_chain
 from aris.core.ledger_cli import ledger_latest, ledger_show
 from aris.core.secrets_cli import secrets_check, secrets_set
+from aris.core.missions_cli import missions_list, missions_show
 from aris.utils.logging import get_logger
 
 log = get_logger("aris.cli")
@@ -54,6 +55,14 @@ def main() -> int:
 
     show = led_sub.add_parser("show", help="pretty-print a ledger file by run_id")
     show.add_argument("run_id", help="run id (filename without .json)")
+
+    missions = sub.add_parser("missions", help="ARIS Mission Control")
+    missions_sub = missions.add_subparsers(dest="missions_cmd")
+
+    missions_sub.add_parser("list", help="list missions")
+
+    mission_show = missions_sub.add_parser("show", help="show mission details")
+    mission_show.add_argument("mission_id", help="mission id")
 
     sec = sub.add_parser("secrets", help="secret utilities")
     sec_sub = sec.add_subparsers(dest="secrets_cmd")
@@ -113,6 +122,14 @@ def main() -> int:
         if args.ledger_cmd == "show":
             return ledger_show(args.run_id, logs_dir)
         led.print_help()
+        return 1
+
+    if args.cmd == "missions":
+        if args.missions_cmd == "list":
+            return missions_list(logs_dir)
+        if args.missions_cmd == "show":
+            return missions_show(args.mission_id, logs_dir)
+        missions.print_help()
         return 1
 
     if args.cmd == "secrets":
