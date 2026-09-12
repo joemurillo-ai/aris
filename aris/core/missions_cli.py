@@ -158,9 +158,21 @@ def missions_show(mission_id: str, logs_dir: Path) -> int:
         if final_verdict != "-":
             break
 
+    if mission.status == "failed":
+        health = "FAILED"
+    elif final_verdict == "PASS":
+        health = "HEALTHY"
+    elif final_verdict == "REVISE":
+        health = "DEGRADED"
+    elif final_verdict == "FAIL":
+        health = "CRITICAL"
+    else:
+        health = "UNKNOWN"
+
     print()
     print("EXECUTION SUMMARY")
     print(_rule())
+    print(f"Health: {health}")
     print(
         f"Runs: {total_runs}  |  "
         f"LLM Runs: {llm_runs}  |  "
