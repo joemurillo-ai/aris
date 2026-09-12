@@ -75,6 +75,7 @@ class Mission:
             "created",
             "awaiting_approval",
             "approved",
+            "running",
         }:
             raise ValueError(
                 f"Mission cannot be quarantined from status: {self.status}"

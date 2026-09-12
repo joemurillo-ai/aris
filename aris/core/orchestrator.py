@@ -6,6 +6,34 @@ from aris.core.mission import Mission
 from aris.core.mission_registry import MissionRegistry
 
 
+class MissionInterrupted(RuntimeError):
+    pass
+
+
+def _assert_mission_execution_allowed(
+    mission_id: str,
+    mission_registry: MissionRegistry,
+) -> Mission:
+    current = mission_registry.get(mission_id)
+
+    if current is None:
+        raise MissionInterrupted(
+            f"Mission disappeared from registry: {mission_id}"
+        )
+
+    if current.status == "quarantined":
+        raise MissionInterrupted(
+            f"Mission quarantined: {mission_id}"
+        )
+
+    if current.status != "running":
+        raise MissionInterrupted(
+            f"Mission execution blocked by status: {current.status}"
+        )
+
+    return current
+
+
 def _extract_verdict(text: str) -> str:
     match = re.search(
         r"^ARIS_VERDICT:\s*(PASS|REVISE|FAIL)\s*$",
@@ -33,6 +61,11 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
             mission_id=mission_id,
         )
 
+        _assert_mission_execution_allowed(
+            mission_id,
+            mission_registry,
+        )
+
         analysis = run_agent(
             (
                 f"MISSION:\n{mission}\n\n"
@@ -42,6 +75,11 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
             "analyst",
             logs_dir=logs_dir,
             mission_id=mission_id,
+        )
+
+        _assert_mission_execution_allowed(
+            mission_id,
+            mission_registry,
         )
 
         critique = run_agent(
@@ -54,6 +92,11 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
             "critic",
             logs_dir=logs_dir,
             mission_id=mission_id,
+        )
+
+        _assert_mission_execution_allowed(
+            mission_id,
+            mission_registry,
         )
 
         verdict = _extract_verdict(critique)
@@ -76,6 +119,11 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
                 "analyst",
                 logs_dir=logs_dir,
                 mission_id=mission_id,
+            )
+
+            _assert_mission_execution_allowed(
+                mission_id,
+                mission_registry,
             )
 
             final_critique = run_agent(
@@ -118,10 +166,17 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
                 final_critique,
             ])
 
+        mission_record = _assert_mission_execution_allowed(
+            mission_id,
+            mission_registry,
+        )
         mission_record.mark_completed()
         mission_registry.save(mission_record)
 
         return "\n".join(sections)
+
+    except MissionInterrupted:
+        raise
 
     except Exception as exc:
         mission_record.mark_failed(str(exc))

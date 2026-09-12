@@ -49,3 +49,14 @@ def test_quarantined_mission_cannot_run():
         match="Mission cannot run from status: quarantined",
     ):
         mission.mark_running()
+
+
+def test_running_mission_can_be_quarantined():
+    mission = Mission("runtime quarantine")
+    mission.mark_running()
+
+    mission.quarantine("joe", "runtime containment")
+
+    assert mission.status == "quarantined"
+    assert mission.quarantine_actor == "joe"
+    assert mission.quarantine_reason == "runtime containment"
