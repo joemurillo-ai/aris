@@ -26,6 +26,42 @@ class Mission:
     failed_at: Optional[str] = None
     failure_reason: Optional[str] = None
 
+    approval_status: str = "not_required"
+    approval_requested_at: Optional[str] = None
+    approved_at: Optional[str] = None
+    denied_at: Optional[str] = None
+    approval_actor: Optional[str] = None
+    approval_reason: Optional[str] = None
+
+    def request_approval(self) -> None:
+        self.requires_approval = True
+        self.approval_status = "pending"
+        self.approval_requested_at = _utc_iso()
+        self.status = "awaiting_approval"
+
+    def approve(self, actor: str) -> None:
+        if self.status != "awaiting_approval":
+            raise ValueError(
+                f"Mission cannot be approved from status: {self.status}"
+            )
+
+        self.approval_status = "approved"
+        self.approved_at = _utc_iso()
+        self.approval_actor = actor
+        self.status = "approved"
+
+    def deny(self, actor: str, reason: Optional[str] = None) -> None:
+        if self.status != "awaiting_approval":
+            raise ValueError(
+                f"Mission cannot be denied from status: {self.status}"
+            )
+
+        self.approval_status = "denied"
+        self.denied_at = _utc_iso()
+        self.approval_actor = actor
+        self.approval_reason = reason
+        self.status = "denied"
+
     def mark_running(self) -> None:
         self.status = "running"
         if self.started_at is None:

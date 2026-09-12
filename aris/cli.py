@@ -10,7 +10,7 @@ from aris.core.runner import run_agent
 from aris.core.orchestrator import run_review_chain
 from aris.core.ledger_cli import ledger_latest, ledger_show
 from aris.core.secrets_cli import secrets_check, secrets_set
-from aris.core.missions_cli import missions_list, missions_show
+from aris.core.missions_cli import missions_list, missions_show, missions_approve, missions_deny
 from aris.utils.logging import get_logger
 
 log = get_logger("aris.cli")
@@ -63,6 +63,32 @@ def main() -> int:
 
     mission_show = missions_sub.add_parser("show", help="show mission details")
     mission_show.add_argument("mission_id", help="mission id")
+
+    mission_approve = missions_sub.add_parser(
+        "approve",
+        help="approve a mission awaiting approval",
+    )
+    mission_approve.add_argument("mission_id", help="mission id")
+    mission_approve.add_argument(
+        "--actor",
+        required=True,
+        help="operator approving the mission",
+    )
+
+    mission_deny = missions_sub.add_parser(
+        "deny",
+        help="deny a mission awaiting approval",
+    )
+    mission_deny.add_argument("mission_id", help="mission id")
+    mission_deny.add_argument(
+        "--actor",
+        required=True,
+        help="operator denying the mission",
+    )
+    mission_deny.add_argument(
+        "--reason",
+        help="optional denial reason",
+    )
 
     sec = sub.add_parser("secrets", help="secret utilities")
     sec_sub = sec.add_subparsers(dest="secrets_cmd")
@@ -129,6 +155,19 @@ def main() -> int:
             return missions_list(logs_dir)
         if args.missions_cmd == "show":
             return missions_show(args.mission_id, logs_dir)
+        if args.missions_cmd == "approve":
+            return missions_approve(
+                args.mission_id,
+                args.actor,
+                logs_dir,
+            )
+        if args.missions_cmd == "deny":
+            return missions_deny(
+                args.mission_id,
+                args.actor,
+                args.reason,
+                logs_dir,
+            )
         missions.print_help()
         return 1
 

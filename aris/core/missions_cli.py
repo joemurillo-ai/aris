@@ -195,6 +195,19 @@ def missions_show(mission_id: str, logs_dir: Path) -> int:
     print(f"{'Failed':<18}{_format_time(mission.failed_at)}")
 
     print()
+    print("APPROVAL")
+    print(_rule())
+    print(f"{'Status':<18}{mission.approval_status.upper()}")
+    print(
+        f"{'Requested':<18}"
+        f"{_format_time(mission.approval_requested_at)}"
+    )
+    print(f"{'Approved':<18}{_format_time(mission.approved_at)}")
+    print(f"{'Denied':<18}{_format_time(mission.denied_at)}")
+    print(f"{'Actor':<18}{mission.approval_actor or '-'}")
+    print(f"{'Reason':<18}{mission.approval_reason or '-'}")
+
+    print()
     print("AUTHORIZED AGENTS")
     print(_rule())
     for agent in mission.allowed_agents:
@@ -246,3 +259,58 @@ def missions_show(mission_id: str, logs_dir: Path) -> int:
         print(mission.failure_reason)
 
     return 0
+
+def missions_approve(
+    mission_id: str,
+    actor: str,
+    logs_dir: Path,
+) -> int:
+    registry = MissionRegistry(logs_dir / "missions")
+    mission = registry.get(mission_id)
+
+    if mission is None:
+        print(f"Mission not found: {mission_id}")
+        return 1
+
+    try:
+        mission.approve(actor)
+    except ValueError as exc:
+        print(f"Approval blocked: {exc}")
+        return 1
+
+    registry.save(mission)
+
+    print(f"Mission approved: {mission.mission_id}")
+    print(f"Actor: {mission.approval_actor}")
+    return 0
+
+
+def missions_deny(
+    mission_id: str,
+    actor: str,
+    reason: Optional[str],
+    logs_dir: Path,
+) -> int:
+    registry = MissionRegistry(logs_dir / "missions")
+    mission = registry.get(mission_id)
+
+    if mission is None:
+        print(f"Mission not found: {mission_id}")
+        return 1
+
+    try:
+        mission.deny(actor, reason)
+    except ValueError as exc:
+        print(f"Denial blocked: {exc}")
+        return 1
+
+    registry.save(mission)
+
+    print(f"Mission denied: {mission.mission_id}")
+    print(f"Actor: {mission.approval_actor}")
+
+    if mission.approval_reason:
+        print(f"Reason: {mission.approval_reason}")
+
+    return 0
+
