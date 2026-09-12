@@ -63,6 +63,16 @@ class Mission:
         self.status = "denied"
 
     def mark_running(self) -> None:
+        if self.requires_approval and self.approval_status != "approved":
+            raise ValueError(
+                "Mission requires approval before execution"
+            )
+
+        if self.status in {"denied", "completed", "failed"}:
+            raise ValueError(
+                f"Mission cannot run from status: {self.status}"
+            )
+
         self.status = "running"
         if self.started_at is None:
             self.started_at = _utc_iso()
