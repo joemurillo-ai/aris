@@ -128,6 +128,47 @@ def missions_show(mission_id: str, logs_dir: Path) -> int:
     )
     print(f"{'Duration':<18}{_duration(mission)}")
 
+    runs = _mission_runs(mission_id, logs_dir)
+
+    total_runs = len(runs)
+    llm_runs = sum(
+        1 for run in runs
+        if (run.get("meta") or {}).get("model")
+    )
+    total_tokens = sum(
+        (run.get("meta") or {}).get("total_tokens") or 0
+        for run in runs
+    )
+    total_latency_ms = sum(
+        (run.get("meta") or {}).get("latency_ms") or 0
+        for run in runs
+    )
+
+    final_verdict = "-"
+    for run in reversed(runs):
+        if run.get("agent") != "critic":
+            continue
+
+        output = run.get("output") or ""
+        for line in output.splitlines():
+            if line.startswith("ARIS_VERDICT:"):
+                final_verdict = line.split(":", 1)[1].strip().upper()
+                break
+
+        if final_verdict != "-":
+            break
+
+    print()
+    print("EXECUTION SUMMARY")
+    print(_rule())
+    print(
+        f"Runs: {total_runs}  |  "
+        f"LLM Runs: {llm_runs}  |  "
+        f"Tokens: {total_tokens:,}  |  "
+        f"Latency: {total_latency_ms / 1000:.1f}s  |  "
+        f"Verdict: {final_verdict}"
+    )
+
     print()
     print("OBJECTIVE")
     print(_rule())
@@ -146,8 +187,6 @@ def missions_show(mission_id: str, logs_dir: Path) -> int:
     print(_rule())
     for agent in mission.allowed_agents:
         print(f"• {agent}")
-
-    runs = _mission_runs(mission_id, logs_dir)
 
     print()
     print("RUN HISTORY")
