@@ -215,6 +215,13 @@ def missions_show(mission_id: str, logs_dir: Path) -> int:
     print(f"{'Reason':<18}{mission.quarantine_reason or '-'}")
 
     print()
+    print("RELEASE")
+    print(_rule())
+    print(f"{'Released':<18}{_format_time(mission.released_at)}")
+    print(f"{'Actor':<18}{mission.release_actor or '-'}")
+    print(f"{'Reason':<18}{mission.release_reason or '-'}")
+
+    print()
     print("AUTHORIZED AGENTS")
     print(_rule())
     for agent in mission.allowed_agents:
@@ -347,6 +354,36 @@ def missions_quarantine(
 
     if mission.quarantine_reason:
         print(f"Reason: {mission.quarantine_reason}")
+
+    return 0
+
+def missions_release(
+    mission_id: str,
+    actor: str,
+    reason: Optional[str],
+    logs_dir: Path,
+) -> int:
+    registry = MissionRegistry(logs_dir / "missions")
+    mission = registry.get(mission_id)
+
+    if mission is None:
+        print(f"Mission not found: {mission_id}")
+        return 1
+
+    try:
+        mission.release(actor, reason)
+    except ValueError as exc:
+        print(f"Release blocked: {exc}")
+        return 1
+
+    registry.save(mission)
+
+    print(f"Mission released: {mission.mission_id}")
+    print(f"Status: {mission.status}")
+    print(f"Actor: {mission.release_actor}")
+
+    if mission.release_reason:
+        print(f"Reason: {mission.release_reason}")
 
     return 0
 

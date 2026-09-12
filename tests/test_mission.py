@@ -60,3 +60,16 @@ def test_running_mission_can_be_quarantined():
     assert mission.status == "quarantined"
     assert mission.quarantine_actor == "joe"
     assert mission.quarantine_reason == "runtime containment"
+
+
+def test_quarantined_approved_mission_can_be_released():
+    mission = Mission("release approved mission")
+    mission.request_approval()
+    mission.approve("joe")
+    mission.quarantine("joe", "temporary containment")
+
+    mission.release("joe", "containment cleared")
+
+    assert mission.status == "approved"
+    assert mission.release_actor == "joe"
+    assert mission.release_reason == "containment cleared"

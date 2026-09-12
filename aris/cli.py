@@ -10,7 +10,7 @@ from aris.core.runner import run_agent
 from aris.core.orchestrator import run_review_chain
 from aris.core.ledger_cli import ledger_latest, ledger_show
 from aris.core.secrets_cli import secrets_check, secrets_set
-from aris.core.missions_cli import missions_list, missions_show, missions_approve, missions_deny, missions_quarantine
+from aris.core.missions_cli import missions_list, missions_show, missions_approve, missions_deny, missions_quarantine, missions_release
 from aris.utils.logging import get_logger
 
 log = get_logger("aris.cli")
@@ -105,6 +105,21 @@ def main() -> int:
         help="optional quarantine reason",
     )
 
+    mission_release = missions_sub.add_parser(
+        "release",
+        help="release a quarantined mission",
+    )
+    mission_release.add_argument("mission_id", help="mission id")
+    mission_release.add_argument(
+        "--actor",
+        required=True,
+        help="operator releasing the mission",
+    )
+    mission_release.add_argument(
+        "--reason",
+        help="optional release reason",
+    )
+
     sec = sub.add_parser("secrets", help="secret utilities")
     sec_sub = sec.add_subparsers(dest="secrets_cmd")
 
@@ -185,6 +200,13 @@ def main() -> int:
             )
         if args.missions_cmd == "quarantine":
             return missions_quarantine(
+                args.mission_id,
+                args.actor,
+                args.reason,
+                logs_dir,
+            )
+        if args.missions_cmd == "release":
+            return missions_release(
                 args.mission_id,
                 args.actor,
                 args.reason,
