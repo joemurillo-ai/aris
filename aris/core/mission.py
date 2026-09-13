@@ -47,52 +47,54 @@ class Mission:
     release_actor: Optional[str] = None
     release_reason: Optional[str] = None
 
+    def _validate_transition(self, action: str, allowed: set[str]) -> None:
+        if not isinstance(self.status, str) or self.status not in {
+            "created", "awaiting_approval", "approved", "running",
+            "completed", "failed", "denied", "quarantined",
+        }:
+            raise ValueError(f"Mission has unknown status: {self.status}")
+        if self.status not in allowed:
+            raise ValueError(
+                f"Mission cannot {action} from status: {self.status}"
+            )
+
+    def _transition(self, action: str, allowed: set[str], destination: str) -> None:
+        self._validate_transition(action, allowed)
+        self.status = destination
+
     def request_approval(self) -> None:
+        self._transition("request approval", {"created"}, "awaiting_approval")
         self.requires_approval = True
         self.approval_status = "pending"
         self.approval_requested_at = _utc_iso()
-        self.status = "awaiting_approval"
 
     def approve(self, actor: str) -> None:
-        if self.status != "awaiting_approval":
-            raise ValueError(
-                f"Mission cannot be approved from status: {self.status}"
-            )
+        self._transition("be approved", {"awaiting_approval"}, "approved")
 
         self.approval_status = "approved"
         self.approved_at = _utc_iso()
         self.approval_actor = actor
-        self.status = "approved"
 
     def deny(self, actor: str, reason: Optional[str] = None) -> None:
-        if self.status != "awaiting_approval":
-            raise ValueError(
-                f"Mission cannot be denied from status: {self.status}"
-            )
+        self._transition("be denied", {"awaiting_approval"}, "denied")
 
         self.approval_status = "denied"
         self.denied_at = _utc_iso()
         self.approval_actor = actor
         self.approval_reason = reason
-        self.status = "denied"
 
     def quarantine(
         self,
         actor: str,
         reason: Optional[str] = None,
     ) -> None:
-        if self.status not in {
-            "created",
-            "awaiting_approval",
-            "approved",
-            "running",
-        }:
-            raise ValueError(
-                f"Mission cannot be quarantined from status: {self.status}"
-            )
-
-        self.pre_quarantine_status = self.status
-        self.status = "quarantined"
+        previous_status = self.status
+        self._transition(
+            "be quarantined",
+            {"created", "awaiting_approval", "approved", "running"},
+            "quarantined",
+        )
+        self.pre_quarantine_status = previous_status
         self.quarantined_at = _utc_iso()
         self.quarantine_actor = actor
         self.quarantine_reason = reason
@@ -102,23 +104,17 @@ class Mission:
         actor: str,
         reason: Optional[str] = None,
     ) -> None:
-        if self.status != "quarantined":
-            raise ValueError(
-                f"Mission cannot be released from status: {self.status}"
-            )
+        self._validate_transition("be released", {"quarantined"})
 
         previous_status = self.pre_quarantine_status
 
         if previous_status == "running":
-            if self.requires_approval:
-                self.status = "approved"
-            else:
-                self.status = "created"
-        elif previous_status in {
+            self.status = "approved" if self.requires_approval else "created"
+        elif previous_status in (
             "created",
             "awaiting_approval",
             "approved",
-        }:
+        ):
             self.status = previous_status
         else:
             raise ValueError(
@@ -134,14 +130,7 @@ class Mission:
         actor: str,
         reason: Optional[str] = None,
     ) -> "Mission":
-        if self.status not in {
-            "failed",
-            "created",
-            "approved",
-        }:
-            raise ValueError(
-                f"Mission cannot be retried from status: {self.status}"
-            )
+        self._validate_transition("be retried", {"failed", "created", "approved"})
 
         retry = Mission(
             objective=self.objective,
@@ -166,23 +155,24 @@ class Mission:
                 "Mission requires approval before execution"
             )
 
-        if self.status in {"denied", "quarantined", "completed", "failed"}:
-            raise ValueError(
-                f"Mission cannot run from status: {self.status}"
-            )
-
-        self.status = "running"
+        self._transition("run", {"created", "approved"}, "running")
         if self.started_at is None:
             self.started_at = _utc_iso()
 
     def mark_completed(self) -> None:
-        self.status = "completed"
+        self._transition("complete", {"running"}, "completed")
         if self.started_at is None:
             self.started_at = _utc_iso()
         self.completed_at = _utc_iso()
 
     def mark_failed(self, reason: str) -> None:
-        self.status = "failed"
+        # A newly persisted mission can fail before its first agent starts
+        # (for example, during setup), so retain that supported path.
+        self._transition(
+            "fail",
+            {"created", "awaiting_approval", "approved", "running"},
+            "failed",
+        )
         if self.started_at is None:
             self.started_at = _utc_iso()
         self.failed_at = _utc_iso()
