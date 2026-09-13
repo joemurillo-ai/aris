@@ -59,6 +59,43 @@ mutations for verification when isolated tests can establish the behavior.
 Use [MISSION_TEMPLATE.md](MISSION_TEMPLATE.md) for future mission briefs; keep
 the template lightweight rather than creating additional workflow machinery.
 
+## Continuing from the roadmap
+
+For a directive such as "Continue ARIS", inspect this repository and working
+tree first, then run from the repository root:
+
+```sh
+.venv/bin/python -m aris.core.roadmap next
+```
+
+`roadmap.toml` is the versioned engineering queue, separate from runtime mission
+records. The command validates it and prints the highest-priority unblocked
+mission and its complete brief. Read that entry and treat its objective,
+acceptance criteria, and scope as the authorized engineering mission. Selection
+is advisory: it grants no permission for live agent execution, credentials,
+infrastructure changes, commits, pushes, or merges.
+
+- Use `agent/<mission-id>` for a newly selected mission. Mark its queue status
+  `in_progress` on that branch, then implement and test the bounded mission.
+- Resume active work instead of starting another mission. If the selector
+  reports `in_progress` or `in_review`, inspect the matching branch and review
+  state. Do not infer approval from elapsed time or from a queue status.
+- Delegate independent review to an agent that did not implement the changes.
+  Fix material findings and obtain fresh review before handoff. Set `in_review`
+  when ready and stop with the standard REVIEW PACKAGE.
+- Set `done` only after operator approval and verified merge of the mission's
+  acceptance criteria. If the merged queue still says `in_review`, reconcile
+  it using merge evidence in the next authorized work branch before selecting
+  further work. Do not amend completed history or edit main directly.
+- Only `done` dependencies unblock work. Explicit `blocked` missions stay
+  blocked until the stated obstacle is resolved; record that obstacle and the
+  recovery action in `recommended_next_move`. Do not silently cancel or reorder
+  missions to bypass dependencies. If no mission qualifies, report why.
+- Queue updates belong in the mission diff and must pass queue validation and
+  tests. Keep briefs current from repository evidence; raise material product
+  or architecture changes with Joe. Consult README for schema and selection
+  rules. Do not implement multiple roadmap missions under one continuation.
+
 ## Required handoff
 
 Finish every mission with a concise REVIEW PACKAGE covering:

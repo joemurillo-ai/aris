@@ -1,0 +1,165 @@
+# Engineering work queue, not runtime mission state. See README and AGENTS.md.
+# Lower priority numbers run first; dependencies must be done, not just reviewed.
+version = 1
+
+[[missions]]
+id = "lifecycle-validation"
+title = "Formalize mission lifecycle transitions"
+objective = "Centralize transition validation and apply it consistently to every Mission state-changing method."
+why_it_matters = "Unchecked approval requests and terminal mutations can bypass governance; a transition contract is the foundation for safe persisted execution and audit events."
+priority = 10
+status = "pending"
+dependencies = []
+acceptance_criteria = [
+  "Document and implement an explicit source/action/destination contract for approval, denial, quarantine, release, start, completion, failure, and retry.",
+  "Reject unknown states and illegal transitions without changing any mission fields; preserve supported valid workflows and retry lineage.",
+  "Add transition-matrix tests, including terminal states, repeat actions, approval prerequisites, and quarantine release; run the full suite.",
+]
+out_of_scope = ["Do not add event storage, API endpoints, or a new execution entry point.", "Escalate intentional changes to approval inheritance or supported workflows before implementing them."]
+recommended_next_move = "Inspect Mission methods and orchestrator exception paths; derive the transition table from existing behavior and tests before editing."
+
+[[missions]]
+id = "privacy-redaction"
+title = "Review and bound persisted sensitive data"
+objective = "Review input/output/error exposure and add a minimal tested redaction boundary for newly emitted operational diagnostics."
+why_it_matters = "RunLedger stores full prompts and outputs and runner logs exceptions; privacy boundaries should precede additional audit storage and API exposure."
+priority = 20
+status = "pending"
+dependencies = []
+acceptance_criteria = [
+  "Map sensitive-data paths in runner, ledger, CLI, and logging using code and synthetic fixtures only; document what remains intentionally persisted.",
+  "Add reusable deterministic redaction for known credential-shaped diagnostic fields and test that synthetic secrets do not appear in emitted errors/logs.",
+  "Document residual risks and obtain operator input before changing raw prompt/output retention or removing operator-visible content.",
+]
+out_of_scope = ["Do not read real credentials or production run content, rotate keys, rewrite existing ledgers, or change infrastructure.", "Do not claim generic redaction guarantees for arbitrary text or implement a full data-loss prevention system."]
+recommended_next_move = "Trace diagnostic emission separately from intentional run payload storage; propose only the smallest safe redaction boundary."
+
+[[missions]]
+id = "governance-events"
+title = "Persist append-only governance history"
+objective = "Record durable governance events alongside mission snapshots so repeated operator actions remain auditable."
+why_it_matters = "Mission snapshots currently overwrite actor/reason fields; event history must exist before expanding mutation entry points."
+priority = 30
+status = "pending"
+dependencies = ["lifecycle-validation", "privacy-redaction"]
+acceptance_criteria = [
+  "Define a versioned event record with event ID, mission ID, action, source/destination status, time, actor, and bounded reason metadata.",
+  "Cover approval, denial, quarantine, release, execution transitions, and retry linkage without overwriting prior events.",
+  "Define and test snapshot/event write failure recovery and concurrent-write assumptions; never report successful audited mutation when its event was not durably recorded.",
+  "Keep existing mission records readable and provide read-only event queries with deterministic ordering.",
+]
+out_of_scope = ["Do not build distributed event sourcing, a new database service, or a web UI.", "Do not fabricate historical events from snapshots or store prompt/output payloads in governance events."]
+recommended_next_move = "Design the smallest local persistence transaction/recovery contract before wiring events into mutations; ask for review if storage architecture must materially change."
+
+[[missions]]
+id = "agent-authorization"
+title = "Enforce mission agent authorization"
+objective = "Enforce allowed_agents and mission execution eligibility at the runner boundary for mission-correlated calls."
+why_it_matters = "allowed_agents is currently displayed but run_agent does not consult it; adding persisted execution without enforcement would expose a bypass."
+priority = 40
+status = "pending"
+dependencies = ["governance-events"]
+acceptance_criteria = [
+  "Reject unauthorized agents, unknown mission IDs, and ineligible mission states before invoking agent handlers.",
+  "Preserve explicitly uncorrelated standalone run behavior and recheck current persisted mission policy for each correlated call.",
+  "Test blocked calls have no handler side effects and produce appropriate bounded audit evidence without leaking input.",
+]
+out_of_scope = ["Do not add user authentication, role management, network policy, or new agent capabilities."]
+recommended_next_move = "Trace all run_agent callers and reuse lifecycle policy and governance events at the shared execution boundary."
+
+[[missions]]
+id = "persisted-execution"
+title = "Execute an existing persisted mission"
+objective = "Add a core execution entry point and CLI command that execute an eligible persisted mission by ID."
+why_it_matters = "run_review_chain always creates a fresh mission, leaving approved missions and retry records without a direct execution path."
+priority = 50
+status = "pending"
+dependencies = ["agent-authorization"]
+acceptance_criteria = [
+  "Execute using the existing mission ID, objective, allowed agents, and approval state; correlate all runs and events to that identity.",
+  "Reject missing, terminal, quarantined, unapproved, or already-running missions before agent calls; preserve runtime interruption checks.",
+  "Keep the existing review command compatible by sharing orchestration logic rather than duplicating the chain.",
+  "Add synthetic end-to-end tests for approved execution, retry execution, interruption, and failure without live model calls.",
+]
+out_of_scope = ["Do not implement scheduling, parallel workers, automatic retries, or crash-resume of a partially executed chain."]
+recommended_next_move = "Separate mission creation from chain execution while preserving existing runtime enforcement and exception behavior."
+
+[[missions]]
+id = "approval-aware-flow"
+title = "Create and execute missions with explicit approval intent"
+objective = "Expose an operator flow for persisting a mission with explicit approval requirements and executing it only when eligible."
+why_it_matters = "Approval methods exist, but creation and execution do not yet form one usable persisted workflow."
+priority = 60
+status = "pending"
+dependencies = ["persisted-execution"]
+acceptance_criteria = [
+  "Provide mission creation with objective and explicit approval requirement, returning a stable persisted ID without executing agents.",
+  "Demonstrate create, request approval, approve or deny, and execute by ID using shared core policies.",
+  "Test approval-required missions cannot execute before approval and denied missions cannot be run; preserve current review compatibility.",
+]
+out_of_scope = ["Do not invent automatic risk-to-approval thresholds, external notifications, or identity verification."]
+recommended_next_move = "Compose the creation CLI with the existing persisted execution entry point and event-backed approval operations."
+
+[[missions]]
+id = "structured-outcomes"
+title = "Persist structured mission outcomes and verdict provenance"
+objective = "Persist a versioned structured outcome with verdict and source run identity, shared by execution and Mission Control queries."
+why_it_matters = "CLI health still depends on parsing run text and the orchestrator uses different parsing rules; authoritative outcomes reduce ambiguity for operators and API consumers."
+priority = 70
+status = "pending"
+dependencies = ["persisted-execution"]
+acceptance_criteria = [
+  "Define and test PASS, REVISE, FAIL, and unknown outcome semantics with source run ID and parser/schema version.",
+  "Use one core outcome contract for new execution results and Mission Control health queries, keeping legacy records readable.",
+  "Test absent, malformed, conflicting, and repeated critic verdicts and document legacy fallback; obtain review before changing supported verdict meaning.",
+]
+out_of_scope = ["Do not backfill or rewrite historical outcomes, invent numeric confidence scores, or change model prompts solely to improve metrics."]
+recommended_next_move = "Compare the existing parsers and propose an explicit compatibility policy before persisting new authoritative outcomes."
+
+[[missions]]
+id = "evaluation-suite"
+title = "Add a repeatable offline governance evaluation suite"
+objective = "Create a small versioned scenario suite that evaluates complete mission workflows and structured outcomes without a live model."
+why_it_matters = "Existing tests cover individual cases; stable cross-layer scenarios will expose policy and orchestration regressions before an API is added."
+priority = 80
+status = "pending"
+dependencies = ["approval-aware-flow", "structured-outcomes"]
+acceptance_criteria = [
+  "Cover approval, denial, quarantine/release, unauthorized agents, retries, malformed verdicts, and execution failure with synthetic fixtures.",
+  "Produce deterministic pass/fail results with scenario identifiers and actionable failure evidence, runnable under the existing test/CI workflow.",
+  "Document that offline fixtures assess governance behavior, not real model reasoning quality.",
+]
+out_of_scope = ["Do not add paid model calls, benchmark infrastructure, a scoring dashboard, or production data fixtures."]
+recommended_next_move = "Build a compact set of operator journeys around the shared core APIs and existing pytest setup."
+
+[[missions]]
+id = "mission-control-api-readiness"
+title = "Define a stable Mission Control query boundary"
+objective = "Expose transport-neutral serializable mission views and errors suitable for a future API while keeping the CLI compatible."
+why_it_matters = "Current views expose mutable Mission objects and raw ledger dictionaries; a stable boundary should precede network or web UI commitments."
+priority = 90
+status = "pending"
+dependencies = ["evaluation-suite", "privacy-redaction"]
+acceptance_criteria = [
+  "Define versioned serializable response shapes for list, detail, summary, outcomes, and governance history without storage objects leaking through.",
+  "Define stable ordering, filter validation, unknown-state behavior, error semantics, and explicit limits for large histories.",
+  "Prove the CLI can consume the shared boundary with compatibility tests and synthetic privacy checks.",
+]
+out_of_scope = ["Do not deploy an HTTP server, choose a web framework, build authentication, or implement a frontend."]
+recommended_next_move = "Inventory current CLI/query contracts and design minimal response types around tested operator journeys."
+
+[[missions]]
+id = "documentation-config"
+title = "Align operator documentation and configuration references"
+objective = "Reconcile stale node labels and document the supported local setup and mission workflow from repository evidence."
+why_it_matters = "README and package/CLI descriptions still identify Node 2 while this repository is operated on Node 1; reducing ambiguity makes future handoffs safer."
+priority = 100
+status = "pending"
+dependencies = []
+acceptance_criteria = [
+  "Document the supported Python setup, test commands, configuration variable names/defaults, and available Mission Control commands.",
+  "Replace unsupported node-specific claims with portable descriptions; verify documented commands using isolated fixtures or help output.",
+  "Keep configuration examples synthetic and document unresolved deployment-specific facts instead of guessing them.",
+]
+out_of_scope = ["Do not change environment values, credentials, dependencies, Docker, SSH, Tailscale, or infrastructure.", "Do not refactor configuration loading behavior in a documentation cleanup."]
+recommended_next_move = "Compare README, pyproject, CLI help, and Settings defaults; update only documentation and descriptive labels supported by evidence."
