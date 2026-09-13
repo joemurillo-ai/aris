@@ -71,12 +71,52 @@ def _mission_runs(mission_id: str, logs_dir: Path) -> list[dict]:
         key=lambda item: item.get("ts_start") or "",
     )
 
+def _final_verdict(runs: list[dict]) -> str:
+    for run in reversed(runs):
+        if run.get("agent") != "critic":
+            continue
+
+        output = run.get("output") or ""
+        for line in output.splitlines():
+            if line.startswith("ARIS_VERDICT:"):
+                return line.split(":", 1)[1].strip().upper()
+
+    return "-"
+
+
+def _mission_health(mission: Mission, final_verdict: str) -> str:
+    if mission.status == "created":
+        return "PENDING"
+    if mission.status == "awaiting_approval":
+        return "WAITING"
+    if mission.status == "approved":
+        return "READY"
+    if mission.status == "running":
+        return "RUNNING"
+    if mission.status == "denied":
+        return "BLOCKED"
+    if mission.status == "quarantined":
+        return "QUARANTINED"
+    if mission.status == "failed":
+        return "FAILED"
+
+    if mission.status == "completed":
+        if final_verdict == "PASS":
+            return "HEALTHY"
+        if final_verdict == "REVISE":
+            return "DEGRADED"
+        if final_verdict == "FAIL":
+            return "CRITICAL"
+
+    return "UNKNOWN"
+
+
 def missions_list(logs_dir: Path) -> int:
     registry = MissionRegistry(logs_dir / "missions")
     missions = registry.list()
 
     print("ARIS MISSION CONTROL")
-    print("─" * 90)
+    print("─" * 104)
 
     if not missions:
         print("No missions found.")
@@ -85,13 +125,14 @@ def missions_list(logs_dir: Path) -> int:
     print(
         f"{'MISSION ID':<14}"
         f"{'STATUS':<18}"
+        f"{'HEALTH':<14}"
         f"{'RISK':<10}"
         f"{'APPROVAL':<12}"
         f"{'ATTEMPT':<10}"
         f"{'RETRY OF':<14}"
         f"{'DURATION':<12}"
     )
-    print("─" * 90)
+    print("─" * 104)
 
     for mission in sorted(
         missions,
@@ -99,10 +140,14 @@ def missions_list(logs_dir: Path) -> int:
         reverse=True,
     ):
         approval = "required" if mission.requires_approval else "no"
+        runs = _mission_runs(mission.mission_id, logs_dir)
+        verdict = _final_verdict(runs)
+        health = _mission_health(mission, verdict)
 
         print(
             f"{mission.mission_id:<14}"
             f"{mission.status.upper():<18}"
+            f"{health:<14}"
             f"{mission.risk_level.upper():<10}"
             f"{approval.upper():<12}"
             f"{mission.attempt:<10}"
@@ -148,30 +193,8 @@ def missions_show(mission_id: str, logs_dir: Path) -> int:
         for run in runs
     )
 
-    final_verdict = "-"
-    for run in reversed(runs):
-        if run.get("agent") != "critic":
-            continue
-
-        output = run.get("output") or ""
-        for line in output.splitlines():
-            if line.startswith("ARIS_VERDICT:"):
-                final_verdict = line.split(":", 1)[1].strip().upper()
-                break
-
-        if final_verdict != "-":
-            break
-
-    if mission.status == "failed":
-        health = "FAILED"
-    elif final_verdict == "PASS":
-        health = "HEALTHY"
-    elif final_verdict == "REVISE":
-        health = "DEGRADED"
-    elif final_verdict == "FAIL":
-        health = "CRITICAL"
-    else:
-        health = "UNKNOWN"
+    final_verdict = _final_verdict(runs)
+    health = _mission_health(mission, final_verdict)
 
     print()
     print("EXECUTION SUMMARY")
