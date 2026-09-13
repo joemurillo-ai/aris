@@ -2,11 +2,20 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-import json
 from typing import Optional
 
 from aris.core.mission import Mission
 from aris.core.mission_registry import MissionRegistry
+# Keep the existing private helper imports compatible with callers.
+from aris.core.mission_policy import (
+    final_verdict as _final_verdict,
+    mission_health as _mission_health,
+)
+from aris.core.mission_query import (
+    mission_runs as _mission_runs,
+    query_missions,
+    summarize_missions,
+)
 
 
 WIDTH = 72
@@ -53,73 +62,16 @@ def _format_time(value: Optional[str]) -> str:
     return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
-
-def _mission_runs(mission_id: str, logs_dir: Path) -> list[dict]:
-    runs = []
-
-    for path in logs_dir.glob("*.json"):
-        try:
-            data = json.loads(path.read_text())
-        except (json.JSONDecodeError, OSError):
-            continue
-
-        if data.get("mission_id") == mission_id:
-            runs.append(data)
-
-    return sorted(
-        runs,
-        key=lambda item: item.get("ts_start") or "",
-    )
-
-def _final_verdict(runs: list[dict]) -> str:
-    for run in reversed(runs):
-        if run.get("agent") != "critic":
-            continue
-
-        output = run.get("output") or ""
-        for line in output.splitlines():
-            if line.startswith("ARIS_VERDICT:"):
-                return line.split(":", 1)[1].strip().upper()
-
-    return "-"
-
-
-def _mission_health(mission: Mission, final_verdict: str) -> str:
-    if mission.status == "created":
-        return "PENDING"
-    if mission.status == "awaiting_approval":
-        return "WAITING"
-    if mission.status == "approved":
-        return "READY"
-    if mission.status == "running":
-        return "RUNNING"
-    if mission.status == "denied":
-        return "BLOCKED"
-    if mission.status == "quarantined":
-        return "QUARANTINED"
-    if mission.status == "failed":
-        return "FAILED"
-
-    if mission.status == "completed":
-        if final_verdict == "PASS":
-            return "HEALTHY"
-        if final_verdict == "REVISE":
-            return "DEGRADED"
-        if final_verdict == "FAIL":
-            return "CRITICAL"
-
-    return "UNKNOWN"
-
-
-def missions_list(logs_dir: Path) -> int:
-    registry = MissionRegistry(logs_dir / "missions")
-    missions = registry.list()
+def missions_list(
+    logs_dir: Path, *, status: Optional[str] = None, health: Optional[str] = None,
+) -> int:
+    missions = query_missions(logs_dir, status=status, health=health)
 
     print("ARIS MISSION CONTROL")
     print("─" * 104)
 
     if not missions:
-        print("No missions found.")
+        print("No matching missions found." if status or health else "No missions found.")
         return 0
 
     print(
@@ -134,15 +86,10 @@ def missions_list(logs_dir: Path) -> int:
     )
     print("─" * 104)
 
-    for mission in sorted(
-        missions,
-        key=lambda item: item.created_at,
-        reverse=True,
-    ):
+    for item in missions:
+        mission = item.mission
         approval = "required" if mission.requires_approval else "no"
-        runs = _mission_runs(mission.mission_id, logs_dir)
-        verdict = _final_verdict(runs)
-        health = _mission_health(mission, verdict)
+        health = item.health
 
         print(
             f"{mission.mission_id:<14}"
@@ -155,6 +102,19 @@ def missions_list(logs_dir: Path) -> int:
             f"{_duration(mission):<12}"
         )
 
+    return 0
+
+
+def missions_summary(logs_dir: Path) -> int:
+    summary = summarize_missions(query_missions(logs_dir))
+    print("ARIS MISSION CONTROL SUMMARY")
+    print(_rule())
+    print(f"Total missions: {summary.total}")
+    for label, counts in (("Status", summary.by_status), ("Health", summary.by_health)):
+        values = " | ".join(
+            f"{name.upper()}: {count}" for name, count in counts.items() if count
+        )
+        print(f"{label}: {values or '-'}")
     return 0
 
 

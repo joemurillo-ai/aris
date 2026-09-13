@@ -10,7 +10,8 @@ from aris.core.runner import run_agent
 from aris.core.orchestrator import run_review_chain
 from aris.core.ledger_cli import ledger_latest, ledger_show
 from aris.core.secrets_cli import secrets_check, secrets_set
-from aris.core.missions_cli import missions_list, missions_show, missions_approve, missions_deny, missions_quarantine, missions_release, missions_retry
+from aris.core.missions_cli import missions_summary, missions_list, missions_show, missions_approve, missions_deny, missions_quarantine, missions_release, missions_retry
+from aris.core.mission_policy import MISSION_STATUSES, MISSION_HEALTHS
 from aris.utils.logging import get_logger
 
 log = get_logger("aris.cli")
@@ -59,7 +60,10 @@ def main() -> int:
     missions = sub.add_parser("missions", help="ARIS Mission Control")
     missions_sub = missions.add_subparsers(dest="missions_cmd")
 
-    missions_sub.add_parser("list", help="list missions")
+    mission_list = missions_sub.add_parser("list", help="list missions")
+    mission_list.add_argument("--status", type=str.lower, choices=MISSION_STATUSES)
+    mission_list.add_argument("--health", type=str.upper, choices=MISSION_HEALTHS)
+    missions_sub.add_parser("summary", help="summarize mission status and health")
 
     mission_show = missions_sub.add_parser("show", help="show mission details")
     mission_show.add_argument("mission_id", help="mission id")
@@ -197,7 +201,9 @@ def main() -> int:
 
     if args.cmd == "missions":
         if args.missions_cmd == "list":
-            return missions_list(logs_dir)
+            return missions_list(logs_dir, status=args.status, health=args.health)
+        if args.missions_cmd == "summary":
+            return missions_summary(logs_dir)
         if args.missions_cmd == "show":
             return missions_show(args.mission_id, logs_dir)
         if args.missions_cmd == "approve":
