@@ -76,7 +76,7 @@ def missions_list(logs_dir: Path) -> int:
     missions = registry.list()
 
     print("ARIS MISSION CONTROL")
-    print(_rule())
+    print("─" * 90)
 
     if not missions:
         print("No missions found.")
@@ -84,12 +84,14 @@ def missions_list(logs_dir: Path) -> int:
 
     print(
         f"{'MISSION ID':<14}"
-        f"{'STATUS':<13}"
+        f"{'STATUS':<18}"
         f"{'RISK':<10}"
         f"{'APPROVAL':<12}"
+        f"{'ATTEMPT':<10}"
+        f"{'RETRY OF':<14}"
         f"{'DURATION':<12}"
     )
-    print(_rule())
+    print("─" * 90)
 
     for mission in sorted(
         missions,
@@ -100,9 +102,11 @@ def missions_list(logs_dir: Path) -> int:
 
         print(
             f"{mission.mission_id:<14}"
-            f"{mission.status.upper():<13}"
+            f"{mission.status.upper():<18}"
             f"{mission.risk_level.upper():<10}"
             f"{approval.upper():<12}"
+            f"{mission.attempt:<10}"
+            f"{(mission.retry_of or '-'):<14}"
             f"{_duration(mission):<12}"
         )
 
