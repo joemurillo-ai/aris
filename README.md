@@ -46,6 +46,47 @@ are skipped as before; non-object JSON is also skipped. Corrupt mission records
 still raise errors. File reads are not a transactional snapshot, so concurrent
 execution can change posture during a query.
 
+## Mission lifecycle contract
+
+`aris/core/mission.py` validates lifecycle actions in the core model. All
+source/action pairs not listed below, including unknown states, raise
+`ValueError` without changing mission fields. Approval prerequisites also apply
+to start. Repeated in-place actions are rejected unless a valid intervening
+transition has made the action eligible again. Retry can create multiple children
+from the same eligible parent.
+
+| Action | Allowed source | Destination |
+| --- | --- | --- |
+| Request approval | created | awaiting_approval; approval pending |
+| Approve / deny | awaiting_approval | approved / denied |
+| Quarantine | created, awaiting_approval, approved, running | quarantined; remember source |
+| Release | quarantined | Restore remembered created, awaiting_approval, or approved |
+| Release previously running | quarantined | approved if approval required, otherwise created |
+| Start | created, approved | running; if approval required, approval_status must be approved |
+| Complete | running | completed |
+| Fail | created, awaiting_approval, approved, running | failed |
+| Retry | created, approved, failed | New approved mission if approval required, otherwise new created mission |
+
+Completed, failed, and denied missions cannot change their own lifecycle state.
+Retry leaves the parent unchanged, assigns a new ID, links `retry_of` to the
+parent, increments `attempt`, and copies the objective, risk, approval requirement,
+and allowed agents. For compatibility, required approval is inherited even when
+the parent had not received approval; changing that policy is separate work.
+Release rejects missing or invalid remembered states and never resumes execution
+directly. Starting again after release retains the original `started_at`;
+pre-execution failure also sets `started_at` under the existing timestamp policy.
+These checks govern method calls, not direct dataclass assignments or loading.
+
+The orchestrator persists completion outside its execution-failure handler. A
+completion save error propagates unchanged, returns no successful result, and
+does not fabricate a failed transition: the in-memory mission remains completed.
+Storage may still contain running, completed, or a partial record because the
+existing snapshot writer is not atomic. No rollback or automatic recovery is
+claimed. Execution errors still attempt to record failed; if that reporting also
+fails, the original error is re-raised with a fixed diagnostic note. Existing run
+records are not rewritten and no governance event history is added here; a
+failed snapshot write is not evidence of a durably recorded terminal state.
+
 ## Engineering roadmap and autonomous mission queue
 
 From the repository root:

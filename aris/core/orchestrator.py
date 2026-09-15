@@ -170,15 +170,22 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
             mission_id,
             mission_registry,
         )
-        mission_record.mark_completed()
-        mission_registry.save(mission_record)
-
-        return "\n".join(sections)
-
     except MissionInterrupted:
         raise
 
     except Exception as exc:
-        mission_record.mark_failed(str(exc))
-        mission_registry.save(mission_record)
+        try:
+            mission_record.mark_failed(str(exc))
+            mission_registry.save(mission_record)
+        except Exception:
+            # Reporting failure must not replace the execution error. Avoid
+            # attaching secondary exception text that could contain run data.
+            exc.add_note("Mission failure state could not be recorded.")
         raise
+
+    # Completion persistence is not execution failure. If saving raises, keep
+    # the completed object intact and propagate the original storage error;
+    # never manufacture a completed -> failed transition or report success.
+    mission_record.mark_completed()
+    mission_registry.save(mission_record)
+    return "\n".join(sections)

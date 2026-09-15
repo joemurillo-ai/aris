@@ -8,7 +8,7 @@ title = "Formalize mission lifecycle transitions"
 objective = "Centralize transition validation and apply it consistently to every Mission state-changing method."
 why_it_matters = "Unchecked approval requests and terminal mutations can bypass governance; a transition contract is the foundation for safe persisted execution and audit events."
 priority = 10
-status = "pending"
+status = "in_review"
 dependencies = []
 acceptance_criteria = [
   "Document and implement an explicit source/action/destination contract for approval, denial, quarantine, release, start, completion, failure, and retry.",
@@ -16,7 +16,7 @@ acceptance_criteria = [
   "Add transition-matrix tests, including terminal states, repeat actions, approval prerequisites, and quarantine release; run the full suite.",
 ]
 out_of_scope = ["Do not add event storage, API endpoints, or a new execution entry point.", "Escalate intentional changes to approval inheritance or supported workflows before implementing them."]
-recommended_next_move = "Inspect Mission methods and orchestrator exception paths; derive the transition table from existing behavior and tests before editing."
+recommended_next_move = "Operator review: lifecycle guards, transition matrix, and completion persistence error handling are implemented and independently reviewed. Approve the local diff before committing or merging; mark done only after approved, verified merge."
 
 [[missions]]
 id = "privacy-redaction"
