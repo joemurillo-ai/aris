@@ -10,6 +10,12 @@ from aris.core.mission_policy import (
     MISSION_HEALTHS, MISSION_STATUSES, final_verdict, mission_health,
 )
 from aris.core.mission_registry import MissionRegistry
+from aris.core.governance import GovernanceEvent, governance_history
+
+
+def mission_history(mission_id: str, logs_dir: Path) -> tuple[GovernanceEvent, ...]:
+    """Recorded governance events in sequence order; never creates or repairs files."""
+    return governance_history(logs_dir / "missions", mission_id)
 
 
 @dataclass(frozen=True)

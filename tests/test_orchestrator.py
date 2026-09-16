@@ -20,11 +20,10 @@ def test_runtime_quarantine_interrupts_review_chain(
 
             assert mission is not None
 
-            mission.quarantine(
-                "joe",
-                "runtime containment test",
+            registry.mutate(
+                mission_id, "quarantined", actor="joe",
+                reason="runtime containment test",
             )
-            registry.save(mission)
 
             return "planner output"
 
@@ -60,21 +59,21 @@ def test_runtime_quarantine_interrupts_review_chain(
 
 @pytest.mark.parametrize("write_before_error", [False, True])
 def test_completion_save_error_is_preserved(tmp_path, monkeypatch, write_before_error):
-    original_save = MissionRegistry.save
+    original_save = MissionRegistry._write_snapshot
     error = OSError("synthetic completion storage failure")
     attempted_states = []
     completed_records = []
 
     def save(registry, mission):
-        attempted_states.append(mission.status)
-        if mission.status == "completed":
+        attempted_states.append(mission["status"])
+        if mission["status"] == "completed":
             completed_records.append(mission)
             if write_before_error:
                 original_save(registry, mission)
             raise error
         return original_save(registry, mission)
 
-    monkeypatch.setattr(MissionRegistry, "save", save)
+    monkeypatch.setattr(MissionRegistry, "_write_snapshot", save)
     monkeypatch.setattr(
         "aris.core.orchestrator.run_agent",
         lambda *args, **kwargs: "ARIS_VERDICT: PASS",
@@ -85,9 +84,9 @@ def test_completion_save_error_is_preserved(tmp_path, monkeypatch, write_before_
 
     assert caught.value is error
     assert attempted_states == ["created", "running", "completed"]
-    assert completed_records[0].status == "completed"
-    assert completed_records[0].failed_at is None
-    assert completed_records[0].failure_reason is None
+    assert completed_records[0]["status"] == "completed"
+    assert completed_records[0]["failed_at"] is None
+    assert completed_records[0]["failure_reason"] is None
     persisted = MissionRegistry(tmp_path / "missions").list()
     assert len(persisted) == 1
     assert persisted[0].status == ("completed" if write_before_error else "running")
@@ -97,20 +96,20 @@ def test_completion_save_error_is_preserved(tmp_path, monkeypatch, write_before_
 
 @pytest.mark.parametrize("failure_save_raises", [False, True])
 def test_execution_error_is_preserved(tmp_path, monkeypatch, failure_save_raises):
-    original_save = MissionRegistry.save
+    original_save = MissionRegistry._write_snapshot
     error = RuntimeError("synthetic execution failure")
     attempted_states = []
 
     def save(registry, mission):
-        attempted_states.append(mission.status)
-        if mission.status == "failed" and failure_save_raises:
+        attempted_states.append(mission["status"])
+        if mission["status"] == "failed" and failure_save_raises:
             raise OSError("synthetic secondary failure")
         return original_save(registry, mission)
 
     def run_agent(*args, **kwargs):
         raise error
 
-    monkeypatch.setattr(MissionRegistry, "save", save)
+    monkeypatch.setattr(MissionRegistry, "_write_snapshot", save)
     monkeypatch.setattr("aris.core.orchestrator.run_agent", run_agent)
 
     with pytest.raises(RuntimeError) as caught:
