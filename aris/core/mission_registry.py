@@ -79,7 +79,7 @@ class MissionRegistry:
         path.unlink()
         sync_directory(path.parent)
 
-    def _install(self, snapshots: list[dict]) -> None:
+    def _install(self, snapshots: List[dict]) -> None:
         for target in snapshots:
             desired = target["snapshot"]
             current = self._raw(desired["mission_id"])
