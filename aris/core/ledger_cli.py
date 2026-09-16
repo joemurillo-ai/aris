@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from typing import Optional
+from aris.core.redaction import redact_text
 
 def _latest_json(logs_dir: Path) -> Optional[Path]:
     if not logs_dir.exists():
@@ -19,7 +20,7 @@ def ledger_latest(logs_dir: Path) -> int:
 def ledger_show(run_id: str, logs_dir: Path) -> int:
     p = logs_dir / f"{run_id}.json"
     if not p.exists():
-        print(f"Not found: {p}")
+        print(redact_text(f"Not found: {p}"))
         return 1
     obj = json.loads(p.read_text())
     print(json.dumps(obj, indent=2, ensure_ascii=False))

@@ -5,6 +5,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
+from aris.core.redaction import redact_text
 
 
 def _utc_iso() -> str:
@@ -69,7 +70,7 @@ class RunLedger:
         return rec
 
     def fail(self, rec: RunRecord, err: str) -> RunRecord:
-        rec.output = err
+        rec.output = redact_text(err)
         rec.status = "error"
         rec.ts_end = _utc_iso()
         self._write(rec)

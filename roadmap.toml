@@ -24,7 +24,7 @@ title = "Review and bound persisted sensitive data"
 objective = "Review input/output/error exposure and add a minimal tested redaction boundary for newly emitted operational diagnostics."
 why_it_matters = "RunLedger stores full prompts and outputs and runner logs exceptions; privacy boundaries should precede additional audit storage and API exposure."
 priority = 20
-status = "pending"
+status = "in_review"
 dependencies = []
 acceptance_criteria = [
   "Map sensitive-data paths in runner, ledger, CLI, and logging using code and synthetic fixtures only; document what remains intentionally persisted.",
@@ -32,7 +32,7 @@ acceptance_criteria = [
   "Document residual risks and obtain operator input before changing raw prompt/output retention or removing operator-visible content.",
 ]
 out_of_scope = ["Do not read real credentials or production run content, rotate keys, rewrite existing ledgers, or change infrastructure.", "Do not claim generic redaction guarantees for arbitrary text or implement a full data-loss prevention system."]
-recommended_next_move = "Trace diagnostic emission separately from intentional run payload storage; propose only the smallest safe redaction boundary."
+recommended_next_move = "Operator review: bounded diagnostic redaction is implemented, tested with synthetic fixtures, and independently approved. Raw run payload retention is unchanged; approve the local diff before committing or publishing."
 
 [[missions]]
 id = "governance-events"

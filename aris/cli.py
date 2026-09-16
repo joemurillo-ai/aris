@@ -1,4 +1,4 @@
-import argparse
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -13,15 +13,25 @@ from aris.core.secrets_cli import secrets_check, secrets_set
 from aris.core.missions_cli import missions_summary, missions_list, missions_show, missions_approve, missions_deny, missions_quarantine, missions_release, missions_retry
 from aris.core.mission_policy import MISSION_STATUSES, MISSION_HEALTHS
 from aris.utils.logging import get_logger
+from aris.core.redaction import render_exception
+from aris.utils.argparse import DiagnosticArgumentParser
 
 log = get_logger("aris.cli")
 
 def main() -> int:
+    try:
+        return _main()
+    except Exception as exc:
+        print(render_exception(exc), file=sys.stderr, end="")
+        return 1
+
+
+def _main() -> int:
     load_dotenv(Path('.env'))
     settings = Settings.from_env()
     logs_dir = Path(settings.logs_dir)
     
-    p = argparse.ArgumentParser(prog="aris", description="ARIS CLI (Node 2)")
+    p = DiagnosticArgumentParser(prog="aris", description="ARIS CLI (Node 2)")
     sub = p.add_subparsers(dest="cmd")
 
     sub.add_parser("ping", help="health check")

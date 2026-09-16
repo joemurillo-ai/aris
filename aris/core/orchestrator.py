@@ -4,6 +4,7 @@ from pathlib import Path
 from aris.core.runner import run_agent
 from aris.core.mission import Mission
 from aris.core.mission_registry import MissionRegistry
+from aris.core.redaction import redact_text
 
 
 class MissionInterrupted(RuntimeError):
@@ -175,7 +176,7 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
 
     except Exception as exc:
         try:
-            mission_record.mark_failed(str(exc))
+            mission_record.mark_failed(redact_text(str(exc)))
             mission_registry.save(mission_record)
         except Exception:
             # Reporting failure must not replace the execution error. Avoid

@@ -87,6 +87,51 @@ fails, the original error is re-raised with a fixed diagnostic note. Existing ru
 records are not rewritten and no governance event history is added here; a
 failed snapshot write is not evidence of a durably recorded terminal state.
 
+## Diagnostic credential redaction
+
+`aris/core/redaction.py` is a deterministic diagnostic boundary, not a general
+secret detector. It replaces supported values with `[REDACTED]`:
+
+- Dictionary values under these exact case-insensitive keys: `api_key`,
+  `openai_api_key`, `access_token`, `refresh_token`, `authorization`, `password`,
+  `client_secret`. The whole value is replaced, including nested containers.
+  Other dictionaries, lists, and tuples are traversed without mutating inputs.
+- Text assignments using those names with `:` or `=`: single/double-quoted
+  values (including backslash escapes), or unquoted values ending at whitespace,
+  comma, semicolon, `}`, or `]`. Field spelling uses underscores, not aliases.
+- Case-insensitive `Bearer` followed by a token using letters, digits, or
+  `._~+/=-`, and `Basic` followed by letters, digits, or `+/=`.
+- Case-sensitive `sk-` followed by at least 16 letters, digits, underscores, or
+  hyphens. This is a shape rule, not provider validation.
+
+Redaction is applied to ARIS JSON log messages, nested context and formatted
+exception chains; CLI uncaught-exception rendering; dynamic doctor/smoke report
+text (fixed presence/validity statuses remain visible);
+Mission Control failure, missing-mission and blocked-action diagnostics; missing
+ledger-file and roadmap queue errors; argparse output for both CLIs; dynamic
+secret-command names/service labels and input prompts; new ledger error output
+through `RunLedger.fail`; and new orchestrator mission failure reasons. Traceback
+text (including chained exceptions, notes, and source lines) is rendered first,
+then redacted. Exception objects and log records are not mutated. The CLI returns
+1 for caught operational exceptions and preserves formatted traceback context;
+argument-parser exit codes and interrupts retain their existing behavior.
+Parser rendering is redacted without changing parsed values or ordinary help.
+
+Raw prompts and successful model outputs remain intentionally retained in the
+ledger and returned/displayed unchanged. Mission objectives, approval/operator
+reasons, run metadata, and explicit `ledger show` payload inspection remain
+unchanged. Existing files are never scrubbed or migrated; Mission Control only
+redacts displayed failure text, without rewriting its stored source. Library
+callers still receive original exceptions and must redact their own rendering.
+
+Residual risks: arbitrary prose, unsupported credential names/formats, encoded
+values, cookies, private keys, custom logging handlers, and payload contents are
+not covered. Unquoted assignment values with spaces are only matched through the
+first delimiter. Diagnostic context must be acyclic JSON-like data; tuples render
+as lists. Supported shapes can also redact innocent lookalikes. This does not
+change payload retention, guarantee safe arbitrary text, or provide full DLP.
+Tests use only synthetic credentials and isolated storage, never live model calls.
+
 ## Engineering roadmap and autonomous mission queue
 
 From the repository root:

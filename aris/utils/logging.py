@@ -3,6 +3,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+from aris.core.redaction import redact_diagnostic
 
 def _utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -21,7 +22,7 @@ class JsonFormatter(logging.Formatter):
                 payload[k] = getattr(record, k)
         if record.exc_info:
             payload["exc"] = self.formatException(record.exc_info)
-        return json.dumps(payload, ensure_ascii=False)
+        return json.dumps(redact_diagnostic(payload), ensure_ascii=False)
 
 def get_logger(name: str = "aris", level: Optional[str] = None) -> logging.Logger:
     lvl = (level or os.getenv("ARIS_LOG_LEVEL") or "INFO").upper()

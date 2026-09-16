@@ -3,6 +3,7 @@ from typing import List
 
 from aris.core.config import Settings, load_dotenv
 from aris.core.secrets import get_secret
+from aris.core.redaction import redact_text
 
 def secrets_check(names: List[str]) -> int:
     load_dotenv()
@@ -11,9 +12,9 @@ def secrets_check(names: List[str]) -> int:
     for n in names:
         v = get_secret(n, settings)
         if v:
-            print(f"{n}: OK")
+            print(f"{redact_text(n)}: OK")
         else:
-            print(f"{n}: MISSING")
+            print(f"{redact_text(n)}: MISSING")
             missing += 1
     return 0 if missing == 0 else 2
 
@@ -33,11 +34,11 @@ def secrets_set(name: str) -> int:
         print("keyring not installed. Run: pip install -e '.[secrets]'")
         return 2
 
-    val = getpass.getpass(f"Enter value for {name} (hidden): ")
+    val = getpass.getpass(f"Enter value for {redact_text(name)} (hidden): ")
     if not val:
         print("Empty value; aborted.")
         return 2
 
     keyring.set_password(service, name, val)
-    print(f"{name}: STORED (keyring:{service})")
+    print(f"{redact_text(name)}: STORED (keyring:{redact_text(service)})")
     return 0
