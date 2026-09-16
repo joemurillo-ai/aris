@@ -79,13 +79,13 @@ These checks govern method calls, not direct dataclass assignments or loading.
 
 The orchestrator persists completion outside its execution-failure handler. A
 completion save error propagates unchanged, returns no successful result, and
-does not fabricate a failed transition: the in-memory mission remains completed.
-Storage may still contain running, completed, or a partial record because the
-existing snapshot writer is not atomic. No rollback or automatic recovery is
-claimed. Execution errors still attempt to record failed; if that reporting also
-fails, the original error is re-raised with a fixed diagnostic note. Existing run
-records are not rewritten and no governance event history is added here; a
-failed snapshot write is not evidence of a durably recorded terminal state.
+does not fabricate a failed transition. Audited persistence uses the event-first
+contract below: snapshots are replaced atomically, and a committed completion
+event can require snapshot recovery after an error. Execution errors still attempt
+to record failed against the latest running state; if that reporting also fails,
+the original error is re-raised with a fixed diagnostic note. Existing run records
+are not rewritten. An event records the commit decision; only successful snapshot
+installation completes the operation's current-state update.
 
 ## Diagnostic credential redaction
 
@@ -131,6 +131,65 @@ first delimiter. Diagnostic context must be acyclic JSON-like data; tuples rende
 as lists. Supported shapes can also redact innocent lookalikes. This does not
 change payload retention, guarantee safe arbitrary text, or provide full DLP.
 Tests use only synthetic credentials and isolated storage, never live model calls.
+
+## Governance persistence contract
+
+Audited mutations use a local POSIX per-mission file lock, reload current state,
+and validate lifecycle policy under that lock. Snapshots remain the current-state
+read model; this is not event sourcing. Each operation first stages a durable
+private recovery record, then publishes an immutable event file and fsyncs its
+directory, then atomically replaces and fsyncs the affected snapshots. Success
+requires both the event and snapshots to be durable. The durable event is the
+commit decision; a later snapshot error is reported but does not undo the event.
+Directory ancestry is synced even when it already exists, closing failed-create
+and competing-creator durability gaps on retry and recovery.
+
+Recovery runs under the same lock before the next mutation, or explicitly through
+`MissionRegistry.recover`. A pending record without a published event is discarded;
+a matching published event is made durable before its snapshot images are applied.
+Revision/event checkpoints prevent repeated recovery from overwriting an already
+applied or newer snapshot. Recovery never deletes or rewrites governance events.
+Read-only history queries do not perform recovery or invent legacy history.
+
+Recovery records temporarily contain snapshot images (including existing mission
+objectives and operator metadata); they are private transaction artifacts, not
+governance events or query results, and are removed after reconciliation. Events
+contain only versioned governance metadata, redacted/bounded actors and reasons,
+per-mission sequence numbers, and retry linkage: no objective, prompt, or output.
+Legacy JSON snapshots remain readable and acquire checkpoints on their first
+audited mutation. Direct snapshot saves cannot overwrite an audited mission.
+
+This contract assumes cooperating writers on one machine and a local filesystem
+supporting flock, atomic replacement, hard links, and fsync. It does not protect
+against manual file edits, distributed writers, or storage that lies about
+durability. Failures after publication can have an uncertain outcome to callers:
+recover and inspect history before issuing another operation. Retry creation locks
+the parent then a fresh child; parent events record the child identity, and recovery
+can complete both snapshots without duplicating the retry.
+
+Core callers use `registry.mutate(id, action, actor=..., reason=...)`; optional
+`expected_status` and `expected_revision` reject stale requests. Actions are
+`approval_requested`, `approved`, `denied`, `quarantined`, `released`,
+`execution_started`, `completed`, `failed`, and `retry_created`. CLI governance
+handlers and the review-chain orchestrator use this boundary. Pure in-memory
+`Mission` methods do not persist or audit by themselves; `save` remains available
+for legacy/bootstrap snapshots but rejects overwrites of audited records.
+
+Version 1 events contain `event_id`, `mission_id`, `sequence`, `action`,
+`source_status`, `destination_status`, UTC `timestamp`, `actor` (up to 128
+characters), `reason` (up to 1024), optional parent/child IDs, and a SHA-256
+`recovery_digest` binding the private recovery images. Metadata is redacted before
+truncation; snapshot operator metadata keeps its existing retention semantics.
+Events reside in `.events/<mission_id>/<sequence>.json`; sequence, not wall-clock
+time, defines order. Retry events describe the unchanged parent's status and name
+the child, whose snapshot retains its existing approval inheritance behavior.
+`mission_query.mission_history(id, logs_dir)` returns immutable event records;
+retry creation is queried in the parent's stream. Missing history returns an
+empty tuple. Invalid event streams fail closed. Snapshot reads can lag a committed
+event until explicit recovery or the next mutation; reads never repair files.
+Recovery covers interrupted transactions, not reconstruction after loss of the
+snapshot and its recovery record. Local file permissions are private (0600 files,
+0700 newly created directories); no extra service or external dependency is used.
 
 ## Engineering roadmap and autonomous mission queue
 

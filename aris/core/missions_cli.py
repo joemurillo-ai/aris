@@ -284,12 +284,10 @@ def missions_approve(
         return 1
 
     try:
-        mission.approve(actor)
+        mission = registry.mutate(mission_id, "approved", actor=actor, expected_status=mission.status)
     except ValueError as exc:
         print(redact_text(f"Approval blocked: {exc}"))
         return 1
-
-    registry.save(mission)
 
     print(f"Mission approved: {mission.mission_id}")
     print(f"Actor: {mission.approval_actor}")
@@ -310,12 +308,10 @@ def missions_deny(
         return 1
 
     try:
-        mission.deny(actor, reason)
+        mission = registry.mutate(mission_id, "denied", actor=actor, reason=reason, expected_status=mission.status)
     except ValueError as exc:
         print(redact_text(f"Denial blocked: {exc}"))
         return 1
-
-    registry.save(mission)
 
     print(f"Mission denied: {mission.mission_id}")
     print(f"Actor: {mission.approval_actor}")
@@ -339,12 +335,10 @@ def missions_quarantine(
         return 1
 
     try:
-        mission.quarantine(actor, reason)
+        mission = registry.mutate(mission_id, "quarantined", actor=actor, reason=reason, expected_status=mission.status)
     except ValueError as exc:
         print(redact_text(f"Quarantine blocked: {exc}"))
         return 1
-
-    registry.save(mission)
 
     print(f"Mission quarantined: {mission.mission_id}")
     print(f"Actor: {mission.quarantine_actor}")
@@ -368,12 +362,10 @@ def missions_release(
         return 1
 
     try:
-        mission.release(actor, reason)
+        mission = registry.mutate(mission_id, "released", actor=actor, reason=reason, expected_status=mission.status)
     except ValueError as exc:
         print(redact_text(f"Release blocked: {exc}"))
         return 1
-
-    registry.save(mission)
 
     print(f"Mission released: {mission.mission_id}")
     print(f"Status: {mission.status}")
@@ -398,12 +390,10 @@ def missions_retry(
         return 1
 
     try:
-        retry = mission.new_retry(actor, reason)
+        retry = registry.mutate(mission_id, "retry_created", actor=actor, reason=reason, expected_status=mission.status)
     except ValueError as exc:
         print(redact_text(f"Retry blocked: {exc}"))
         return 1
-
-    registry.save(retry)
 
     print(f"Retry created: {retry.mission_id}")
     print(f"Retry of: {retry.retry_of}")

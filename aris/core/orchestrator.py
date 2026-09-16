@@ -50,8 +50,9 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
     mission_record = Mission(objective=mission)
     mission_registry = MissionRegistry(logs_dir / "missions")
     mission_registry.save(mission_record)
-    mission_record.mark_running()
-    mission_registry.save(mission_record)
+    mission_record = mission_registry.mutate(
+        mission_record.mission_id, "execution_started", expected_status="created",
+    )
     mission_id = mission_record.mission_id
 
     try:
@@ -176,8 +177,9 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
 
     except Exception as exc:
         try:
-            mission_record.mark_failed(redact_text(str(exc)))
-            mission_registry.save(mission_record)
+            mission_registry.mutate(
+                mission_id, "failed", reason=redact_text(str(exc)), expected_status="running",
+            )
         except Exception:
             # Reporting failure must not replace the execution error. Avoid
             # attaching secondary exception text that could contain run data.
@@ -187,6 +189,5 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
     # Completion persistence is not execution failure. If saving raises, keep
     # the completed object intact and propagate the original storage error;
     # never manufacture a completed -> failed transition or report success.
-    mission_record.mark_completed()
-    mission_registry.save(mission_record)
+    mission_registry.mutate(mission_id, "completed", expected_status="running")
     return "\n".join(sections)
