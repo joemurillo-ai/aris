@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from aris.core.redaction import redact_text
 from aris.core.config import load_dotenv, Settings
 from aris.core.runner import run_agent
 
@@ -44,17 +45,17 @@ def smoke(env_path: Path | None = None, agent: str = "planner", prompt: str = "s
 
     # 2) Config checks
     logs_dir = Path(settings.logs_dir)
-    lines.append(f"logs_dir: {logs_dir}")
+    lines.append(redact_text(f"logs_dir: {logs_dir}"))
 
     # .env checks (best-effort)
     env_file = env_path or Path(".env")
     if env_file.exists():
         mode = _file_mode(env_file)
-        lines.append(f".env: OK ({env_file}) perm={oct(mode) if mode is not None else 'unknown'}")
+        lines.append(redact_text(f".env: OK ({env_file}) perm={oct(mode) if mode is not None else 'unknown'}"))
         if mode is not None and mode != 0o600:
             lines.append("WARN: recommended chmod 600 .env")
     else:
-        lines.append(f".env: MISSING ({env_file})")
+        lines.append(redact_text(f".env: MISSING ({env_file})"))
         ok = False
 
     # Logs dir writable
@@ -65,7 +66,7 @@ def smoke(env_path: Path | None = None, agent: str = "planner", prompt: str = "s
         testfile.unlink(missing_ok=True)
         lines.append("logs: OK (writable)")
     except Exception as e:
-        lines.append(f"logs: FAIL (not writable) {e}")
+        lines.append(redact_text(f"logs: FAIL (not writable) {e}"))
         ok = False
 
     # Secret presence
@@ -85,11 +86,11 @@ def smoke(env_path: Path | None = None, agent: str = "planner", prompt: str = "s
     started_at = time.time()
     try:
         out = run_agent(prompt, agent, logs_dir)
-        lines.append(f"model_call: OK (agent={agent})")
+        lines.append(redact_text(f"model_call: OK (agent={agent})"))
         if not out or not str(out).strip():
             lines.append("WARN: model output empty")
     except Exception as e:
-        lines.append(f"model_call: FAIL {e}")
+        lines.append(redact_text(f"model_call: FAIL {e}"))
         lines.append("smoke: FAIL")
         return SmokeReport(ok=False, lines=lines)
 

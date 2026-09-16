@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from aris.core.redaction import redact_text
+
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -123,7 +125,7 @@ def missions_show(mission_id: str, logs_dir: Path) -> int:
     mission = registry.get(mission_id)
 
     if mission is None:
-        print(f"Mission not found: {mission_id}")
+        print(redact_text(f"Mission not found: {mission_id}"))
         return 1
 
     print("ARIS MISSION")
@@ -265,7 +267,7 @@ def missions_show(mission_id: str, logs_dir: Path) -> int:
         print()
         print("FAILURE")
         print(_rule())
-        print(mission.failure_reason)
+        print(redact_text(mission.failure_reason))
 
     return 0
 
@@ -278,13 +280,13 @@ def missions_approve(
     mission = registry.get(mission_id)
 
     if mission is None:
-        print(f"Mission not found: {mission_id}")
+        print(redact_text(f"Mission not found: {mission_id}"))
         return 1
 
     try:
         mission.approve(actor)
     except ValueError as exc:
-        print(f"Approval blocked: {exc}")
+        print(redact_text(f"Approval blocked: {exc}"))
         return 1
 
     registry.save(mission)
@@ -304,13 +306,13 @@ def missions_deny(
     mission = registry.get(mission_id)
 
     if mission is None:
-        print(f"Mission not found: {mission_id}")
+        print(redact_text(f"Mission not found: {mission_id}"))
         return 1
 
     try:
         mission.deny(actor, reason)
     except ValueError as exc:
-        print(f"Denial blocked: {exc}")
+        print(redact_text(f"Denial blocked: {exc}"))
         return 1
 
     registry.save(mission)
@@ -333,13 +335,13 @@ def missions_quarantine(
     mission = registry.get(mission_id)
 
     if mission is None:
-        print(f"Mission not found: {mission_id}")
+        print(redact_text(f"Mission not found: {mission_id}"))
         return 1
 
     try:
         mission.quarantine(actor, reason)
     except ValueError as exc:
-        print(f"Quarantine blocked: {exc}")
+        print(redact_text(f"Quarantine blocked: {exc}"))
         return 1
 
     registry.save(mission)
@@ -362,13 +364,13 @@ def missions_release(
     mission = registry.get(mission_id)
 
     if mission is None:
-        print(f"Mission not found: {mission_id}")
+        print(redact_text(f"Mission not found: {mission_id}"))
         return 1
 
     try:
         mission.release(actor, reason)
     except ValueError as exc:
-        print(f"Release blocked: {exc}")
+        print(redact_text(f"Release blocked: {exc}"))
         return 1
 
     registry.save(mission)
@@ -392,13 +394,13 @@ def missions_retry(
     mission = registry.get(mission_id)
 
     if mission is None:
-        print(f"Mission not found: {mission_id}")
+        print(redact_text(f"Mission not found: {mission_id}"))
         return 1
 
     try:
         retry = mission.new_retry(actor, reason)
     except ValueError as exc:
-        print(f"Retry blocked: {exc}")
+        print(redact_text(f"Retry blocked: {exc}"))
         return 1
 
     registry.save(retry)

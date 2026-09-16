@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple
 
+from aris.core.redaction import redact_text
 from aris.core.config import load_dotenv, Settings
 
 
@@ -47,18 +48,18 @@ def doctor(env_path: Optional[Path] = None) -> DoctorReport:
     lines: list[str] = []
     ok = True
 
-    lines.append(f"python: {sys.version.split()[0]}")
-    lines.append(f"venv: {'OK' if _is_venv_active() else 'NO (activate .venv)'}")
+    lines.append(redact_text(f"python: {sys.version.split()[0]}"))
+    lines.append(redact_text(f"venv: {'OK' if _is_venv_active() else 'NO (activate .venv)'}"))
     if not _is_venv_active():
         ok = False
 
     rc, out = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
     if rc == 0:
-        lines.append(f"git branch: {out}")
+        lines.append(redact_text(f"git branch: {out}"))
         rc2, out2 = _run(["git", "status", "-sb"])
         if rc2 == 0:
             dirty = (" M " in out2) or ("??" in out2)
-            lines.append(f"git status: {'DIRTY' if dirty else 'CLEAN'}")
+            lines.append(redact_text(f"git status: {'DIRTY' if dirty else 'CLEAN'}"))
     else:
         lines.append("git: not available (ok)")
 
@@ -66,11 +67,11 @@ def doctor(env_path: Optional[Path] = None) -> DoctorReport:
     env_file = env_path if env_path is not None else (cwd / ".env")
     if env_file.exists():
         mode = _file_mode(env_file)
-        lines.append(f".env: OK ({env_file}) perm={oct(mode) if mode is not None else 'unknown'}")
+        lines.append(redact_text(f".env: OK ({env_file}) perm={oct(mode) if mode is not None else 'unknown'}"))
         if mode is not None and mode != 0o600:
             lines.append("WARN: recommended chmod 600 .env")
     else:
-        lines.append(f".env: MISSING ({env_file})")
+        lines.append(redact_text(f".env: MISSING ({env_file})"))
         ok = False
 
     logs_dir = Path(settings.logs_dir)
@@ -79,9 +80,9 @@ def doctor(env_path: Optional[Path] = None) -> DoctorReport:
         testfile = logs_dir / ".write_test"
         testfile.write_text("ok")
         testfile.unlink(missing_ok=True)
-        lines.append(f"logs dir: OK ({logs_dir})")
+        lines.append(redact_text(f"logs dir: OK ({logs_dir})"))
     except Exception as e:
-        lines.append(f"logs dir: FAIL ({logs_dir}) {e}")
+        lines.append(redact_text(f"logs dir: FAIL ({logs_dir}) {e}"))
         ok = False
 
     api_key = os.getenv("OPENAI_API_KEY", "")
@@ -91,5 +92,5 @@ def doctor(env_path: Optional[Path] = None) -> DoctorReport:
         lines.append("OPENAI_API_KEY: MISSING/INVALID (set in .env)")
         ok = False
 
-    lines.append(f"overall: {'OK' if ok else 'FAIL'}")
+    lines.append(redact_text(f"overall: {'OK' if ok else 'FAIL'}"))
     return DoctorReport(ok=ok, lines=lines)

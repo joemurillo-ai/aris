@@ -5,12 +5,13 @@ executes a mission, reads credentials, or changes the queue.
 """
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass
 from pathlib import Path
 import re
 import sys
 import tomllib
+from aris.core.redaction import redact_text
+from aris.utils.argparse import DiagnosticArgumentParser
 
 
 STATUSES = {"pending", "in_progress", "in_review", "blocked", "done", "cancelled"}
@@ -142,14 +143,14 @@ def select_next(missions: tuple[RoadmapMission, ...]) -> Selection:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Inspect the ARIS engineering mission queue")
+    parser = DiagnosticArgumentParser(description="Inspect the ARIS engineering mission queue")
     parser.add_argument("command", choices=("next", "validate"))
     parser.add_argument("--queue", type=Path, default=Path("roadmap.toml"))
     args = parser.parse_args(argv)
     try:
         missions = load_queue(args.queue)
     except (OSError, ValueError) as exc:
-        print(f"Queue error: {exc}", file=sys.stderr)
+        print(redact_text(f"Queue error: {exc}"), file=sys.stderr)
         return 2
     if args.command == "validate":
         print(f"Queue valid: {len(missions)} missions")
