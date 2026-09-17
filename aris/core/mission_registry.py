@@ -142,7 +142,14 @@ class MissionRegistry:
         )
         append_event(self.root, event)
 
-    def authorize_agent(self, mission_id: str, agent_name: str) -> None:
+    def _execution_matches(self, mission_id: str, execution_id: str) -> bool:
+        """Caller holds the mission lock; denial events do not change ownership."""
+        latest = next((event for event in reversed(self.history(mission_id))
+                       if event.action == "execution_started"), None)
+        return latest is not None and latest.event_id == execution_id
+
+    def authorize_agent(self, mission_id: str, agent_name: str,
+                        execution_id: str | None = None) -> None:
         """Admit one call under lock; never hold the lock during a handler call."""
         with mission_lock(self.root, mission_id):
             self._recover_locked(mission_id)
@@ -153,13 +160,35 @@ class MissionRegistry:
             if mission.mission_id != mission_id:
                 raise ValueError("Mission snapshot identity mismatch")
             code = denial_code(mission, agent_name)
+            if code is None and execution_id is not None and not self._execution_matches(mission_id, execution_id):
+                code = "execution_superseded"
             if code is not None:
                 self._append_evidence_locked(mission, "authorization_denied", code, agent_name)
                 raise AuthorizationDenied(code)
 
     def mutate(self, mission_id: str, action: str, *, actor: str | None = "system",
                reason: str | None = None, expected_status: str | None = None,
-               expected_revision: int | None = None) -> Mission:
+               expected_revision: int | None = None,
+               expected_execution_id: str | None = None) -> Mission:
+        mission, _ = self._mutate(
+            mission_id, action, actor=actor, reason=reason,
+            expected_status=expected_status, expected_revision=expected_revision,
+            expected_execution_id=expected_execution_id,
+        )
+        return mission
+
+    def start_execution(self, mission_id: str) -> tuple[Mission, str]:
+        """Atomically admit the current persisted mission and return its start event.
+
+        Recovery, lifecycle validation, event publication and snapshot installation
+        all happen under the existing mission lock. Errors never grant admission.
+        """
+        return self._mutate(mission_id, "execution_started")
+
+    def _mutate(self, mission_id: str, action: str, *, actor: str | None = "system",
+                reason: str | None = None, expected_status: str | None = None,
+                expected_revision: int | None = None,
+                expected_execution_id: str | None = None) -> tuple[Mission, str]:
         """Commit under lock; latest lifecycle state wins over caller snapshots.
 
         The event is immutable commit evidence. A snapshot error still raises;
@@ -175,6 +204,10 @@ class MissionRegistry:
             if raw is None:
                 raise ValueError("Mission not found")
             mission = self._mission(raw)
+            if mission.mission_id != mission_id:
+                raise ValueError("Mission snapshot identity mismatch")
+            if expected_execution_id is not None and not self._execution_matches(mission_id, expected_execution_id):
+                raise ValueError("Mission execution superseded")
             revision = raw.get("_governance", {}).get("revision", 0)
             if ((expected_status is not None and mission.status != expected_status)
                     or (expected_revision is not None and revision != expected_revision)):
@@ -216,4 +249,4 @@ class MissionRegistry:
             append_event(self.root, event)
             self._install(snapshots)
             self._clear_pending(mission_id)
-            return child if child is not None else mission
+            return (child if child is not None else mission), event_id

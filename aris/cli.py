@@ -7,7 +7,7 @@ from aris.core.doctor import doctor as run_doctor
 from aris.core.smoke import smoke as run_smoke
 from aris.core.agents import list_agents
 from aris.core.runner import run_agent
-from aris.core.orchestrator import run_review_chain
+from aris.core.orchestrator import execute_mission, run_review_chain
 from aris.core.ledger_cli import ledger_latest, ledger_show
 from aris.core.secrets_cli import secrets_check, secrets_set
 from aris.core.missions_cli import missions_summary, missions_list, missions_show, missions_approve, missions_deny, missions_quarantine, missions_release, missions_retry
@@ -77,6 +77,9 @@ def _main() -> int:
 
     mission_show = missions_sub.add_parser("show", help="show mission details")
     mission_show.add_argument("mission_id", help="mission id")
+
+    mission_execute = missions_sub.add_parser("execute", help="execute an eligible persisted mission")
+    mission_execute.add_argument("mission_id", help="mission id")
 
     mission_approve = missions_sub.add_parser(
         "approve",
@@ -210,6 +213,9 @@ def _main() -> int:
         return 1
 
     if args.cmd == "missions":
+        if args.missions_cmd == "execute":
+            print(execute_mission(args.mission_id, logs_dir))
+            return 0
         if args.missions_cmd == "list":
             return missions_list(logs_dir, status=args.status, health=args.health)
         if args.missions_cmd == "summary":

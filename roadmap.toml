@@ -73,7 +73,7 @@ title = "Execute an existing persisted mission"
 objective = "Add a core execution entry point and CLI command that execute an eligible persisted mission by ID."
 why_it_matters = "run_review_chain always creates a fresh mission, leaving approved missions and retry records without a direct execution path."
 priority = 50
-status = "pending"
+status = "in_review"
 dependencies = ["agent-authorization"]
 acceptance_criteria = [
   "Execute using the existing mission ID, objective, allowed agents, and approval state; correlate all runs and events to that identity.",
@@ -82,7 +82,7 @@ acceptance_criteria = [
   "Add synthetic end-to-end tests for approved execution, retry execution, interruption, and failure without live model calls.",
 ]
 out_of_scope = ["Do not implement scheduling, parallel workers, automatic retries, or crash-resume of a partially executed chain."]
-recommended_next_move = "Separate mission creation from chain execution while preserving existing runtime enforcement and exception behavior."
+recommended_next_move = "Operator review: persisted execution and CLI share the review chain, use atomic audited admission, and bind calls and terminal writes to the start event. Synthetic tests and independent review passed; approve the uncommitted diff before publication."
 
 [[missions]]
 id = "approval-aware-flow"
