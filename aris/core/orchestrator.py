@@ -5,6 +5,7 @@ from aris.core.runner import run_agent
 from aris.core.mission import Mission
 from aris.core.mission_registry import MissionRegistry
 from aris.core.redaction import redact_text
+from aris.core.authorization import AuthorizationDenied, AuthorizationAuditError
 
 
 class MissionInterrupted(RuntimeError):
@@ -172,7 +173,7 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
             mission_id,
             mission_registry,
         )
-    except MissionInterrupted:
+    except (MissionInterrupted, AuthorizationDenied, AuthorizationAuditError):
         raise
 
     except Exception as exc:

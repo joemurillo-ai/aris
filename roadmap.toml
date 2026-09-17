@@ -57,7 +57,7 @@ title = "Enforce mission agent authorization"
 objective = "Enforce allowed_agents and mission execution eligibility at the runner boundary for mission-correlated calls."
 why_it_matters = "allowed_agents is currently displayed but run_agent does not consult it; adding persisted execution without enforcement would expose a bypass."
 priority = 40
-status = "pending"
+status = "in_review"
 dependencies = ["governance-events"]
 acceptance_criteria = [
   "Reject unauthorized agents, unknown mission IDs, and ineligible mission states before invoking agent handlers.",
@@ -65,7 +65,7 @@ acceptance_criteria = [
   "Test blocked calls have no handler side effects and produce appropriate bounded audit evidence without leaking input.",
 ]
 out_of_scope = ["Do not add user authentication, role management, network policy, or new agent capabilities."]
-recommended_next_move = "Trace all run_agent callers and reuse lifecycle policy and governance events at the shared execution boundary."
+recommended_next_move = "Operator review: per-call runner authorization, non-mutating denial events, and separate rejection evidence are implemented and independently approved. Python 3.12 compatibility and side-effect ordering are verified; approve the local diff before committing or publishing."
 
 [[missions]]
 id = "persisted-execution"
