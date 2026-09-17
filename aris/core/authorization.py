@@ -59,7 +59,8 @@ def record_rejection(logs_dir: Path, mission_id: str, agent_name: str, code: str
     write_json(logs_dir / ".authorization-rejections" / f"{event_id}.json", record, immutable=True)
 
 
-def authorize_call(logs_dir: Path, mission_id: str, agent_name: str) -> None:
+def authorize_call(logs_dir: Path, mission_id: str, agent_name: str,
+                   execution_id: str | None = None) -> None:
     """No prompt parameter: admission or durable denial before runner side effects."""
     # The registry imports the pure policy; defer this dependency to the boundary.
     from aris.core.mission_registry import MissionRegistry
@@ -70,7 +71,7 @@ def authorize_call(logs_dir: Path, mission_id: str, agent_name: str) -> None:
         except ValueError:
             record_rejection(logs_dir, mission_id, agent_name, "mission_id_invalid")
             raise AuthorizationDenied("mission_id_invalid")
-        MissionRegistry(logs_dir / "missions").authorize_agent(mission_id, agent_name)
+        MissionRegistry(logs_dir / "missions").authorize_agent(mission_id, agent_name, execution_id)
     except AuthorizationDenied:
         raise
     except Exception as exc:

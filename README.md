@@ -191,6 +191,47 @@ Recovery covers interrupted transactions, not reconstruction after loss of the
 snapshot and its recovery record. Local file permissions are private (0600 files,
 0700 newly created directories); no extra service or external dependency is used.
 
+## Execute a persisted mission
+
+```sh
+aris missions execute <mission_id>
+```
+
+`aris.core.orchestrator.execute_mission(mission_id, logs_dir)` runs the existing
+planner → analyst → critic chain (including its single REVISE pass) against the
+stored mission. It preserves the ID, objective, allowed agents, approval fields,
+and retry lineage. All run records and governance events use that mission ID.
+`aris review <text>` still creates a fresh mission and uses the same execution
+function, prompts, verdict interpretation, and report format.
+
+Admission uses the registry's existing per-mission lock: recover pending writes,
+load the current snapshot, apply `Mission.mark_running`, and durably record
+`execution_started` plus the snapshot before returning. There is no unlocked
+eligibility check followed by a separate start. Only `created` and `approved`
+states can start, and required approval must already be granted. Missing,
+unknown-state, awaiting-approval, denied, quarantined, running, completed, and
+failed missions cannot start. Execute a previously created retry child by its
+own ID; execution creates neither a replacement mission nor another retry.
+
+The start event ID identifies this execution. Each chain call checks it under
+the authorization lock, and completion/failure mutations check it under the
+registry lock. This prevents an old chain from continuing or completing a newer
+execution after quarantine/release/restart. It adds no fields to stored mission
+or event schemas. Per-call policy enforcement still applies; allowlists are never
+expanded to make the chain succeed. Authorization errors propagate without
+marking the mission failed. An authorized handler runs outside the lock and is
+not cancelled mid-call; subsequent calls recheck policy and execution identity.
+
+Storage failures propagate without reporting success. If a start event is durable
+but snapshot installation fails, recovery can finish the running snapshot, but
+the failed caller invokes no agents and a repeated execute is rejected as already
+running. Recovery repairs persistence; it does not resume the chain. Operators
+must inspect and use existing lifecycle actions to resolve interrupted execution.
+Completion storage failures similarly preserve recoverable evidence without
+manufacturing a failed transition. CLI errors use the existing redacted error
+renderer and nonzero exit status. This command performs real agent calls when
+used normally; automated tests use only temporary storage and synthetic handlers.
+
 ## Mission-correlated agent authorization
 
 `run_agent(..., mission_id=...)` authorizes one call before constructing a run
@@ -206,6 +247,7 @@ work and reads the latest snapshot. The eligibility order is deterministic:
 | Status is anything other than exactly `running` | `mission_not_running` |
 | Approval is required but not exactly `approved`, or the requirement flag is malformed | `approval_invalid` |
 | Agent is not an exact member of a valid string-list `allowed_agents` | `agent_not_allowed` |
+| A supplied execution ID differs from the latest start event | `execution_superseded` |
 
 `approved` does not start execution. Authorization neither starts a mission nor
 changes its policy. The lock is released before ledger creation and handler

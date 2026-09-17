@@ -48,13 +48,20 @@ def _extract_verdict(text: str) -> str:
 
 
 def run_review_chain(mission: str, logs_dir: Path) -> str:
+    """Create a fresh mission, then use the persisted execution entry point."""
     mission_record = Mission(objective=mission)
     mission_registry = MissionRegistry(logs_dir / "missions")
     mission_registry.save(mission_record)
-    mission_record = mission_registry.mutate(
-        mission_record.mission_id, "execution_started", expected_status="created",
-    )
+    return execute_mission(mission_record.mission_id, logs_dir)
+
+
+def execute_mission(mission_id: str, logs_dir: Path) -> str:
+    """Execute an eligible stored mission without replacing its identity or policy."""
+    mission_registry = MissionRegistry(logs_dir / "missions")
+    # Admission must complete durably before entering execution/failure handling.
+    mission_record, execution_id = mission_registry.start_execution(mission_id)
     mission_id = mission_record.mission_id
+    mission = mission_record.objective
 
     try:
         plan = run_agent(
@@ -62,6 +69,7 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
             "planner",
             logs_dir=logs_dir,
             mission_id=mission_id,
+            execution_id=execution_id,
         )
 
         _assert_mission_execution_allowed(
@@ -78,6 +86,7 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
             "analyst",
             logs_dir=logs_dir,
             mission_id=mission_id,
+            execution_id=execution_id,
         )
 
         _assert_mission_execution_allowed(
@@ -95,6 +104,7 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
             "critic",
             logs_dir=logs_dir,
             mission_id=mission_id,
+            execution_id=execution_id,
         )
 
         _assert_mission_execution_allowed(
@@ -122,6 +132,7 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
                 "analyst",
                 logs_dir=logs_dir,
                 mission_id=mission_id,
+                execution_id=execution_id,
             )
 
             _assert_mission_execution_allowed(
@@ -140,6 +151,7 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
                 "critic",
                 logs_dir=logs_dir,
                 mission_id=mission_id,
+                execution_id=execution_id,
             )
 
             final_verdict = _extract_verdict(final_critique)
@@ -180,6 +192,7 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
         try:
             mission_registry.mutate(
                 mission_id, "failed", reason=redact_text(str(exc)), expected_status="running",
+                expected_execution_id=execution_id,
             )
         except Exception:
             # Reporting failure must not replace the execution error. Avoid
@@ -190,5 +203,8 @@ def run_review_chain(mission: str, logs_dir: Path) -> str:
     # Completion persistence is not execution failure. If saving raises, keep
     # the completed object intact and propagate the original storage error;
     # never manufacture a completed -> failed transition or report success.
-    mission_registry.mutate(mission_id, "completed", expected_status="running")
+    mission_registry.mutate(
+        mission_id, "completed", expected_status="running",
+        expected_execution_id=execution_id,
+    )
     return "\n".join(sections)

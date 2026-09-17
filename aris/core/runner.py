@@ -17,9 +17,11 @@ def run_agent(
     agent_name: str,
     logs_dir: Path,
     mission_id: Optional[str] = None,
+    *,
+    execution_id: Optional[str] = None,
 ) -> str:
     if mission_id is not None:
-        authorize_call(logs_dir, mission_id, agent_name)
+        authorize_call(logs_dir, mission_id, agent_name, execution_id)
     ledger = RunLedger(logs_dir)
 
     rec = ledger.start(

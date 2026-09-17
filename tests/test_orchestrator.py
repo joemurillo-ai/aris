@@ -13,6 +13,7 @@ def test_runtime_quarantine_interrupts_review_chain(
         agent_name,
         logs_dir,
         mission_id=None,
+        execution_id=None,
     ):
         if agent_name == "planner":
             registry = MissionRegistry(logs_dir / "missions")
