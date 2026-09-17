@@ -191,6 +191,61 @@ Recovery covers interrupted transactions, not reconstruction after loss of the
 snapshot and its recovery record. Local file permissions are private (0600 files,
 0700 newly created directories); no extra service or external dependency is used.
 
+## Mission-correlated agent authorization
+
+`run_agent(..., mission_id=...)` authorizes one call before constructing a run
+ledger, persisting input, resolving an agent, or invoking its handler. Only
+`mission_id=None` uses the unchanged standalone path; an empty string is invalid.
+Under the existing per-mission lock, authorization recovers pending governance
+work and reads the latest snapshot. The eligibility order is deterministic:
+
+| Check | Denial code |
+| --- | --- |
+| Identifier fails the existing mission ID syntax | `mission_id_invalid` |
+| No snapshot after recovery | `mission_unknown` |
+| Status is anything other than exactly `running` | `mission_not_running` |
+| Approval is required but not exactly `approved`, or the requirement flag is malformed | `approval_invalid` |
+| Agent is not an exact member of a valid string-list `allowed_agents` | `agent_not_allowed` |
+
+`approved` does not start execution. Authorization neither starts a mission nor
+changes its policy. The lock is released before ledger creation and handler
+execution. Admission remains valid for that one call if policy changes afterward;
+each subsequent call rechecks. No long-running handler holds the mission lock.
+
+Known denials append `authorization_denied` to the existing governance stream
+under lock, with unchanged source/destination status, actor `system`, a fixed
+denial code in `reason`, and optional redacted/bounded `agent` (128 characters).
+This evidence-only path does not stage recovery images, replace snapshots, or
+advance snapshot revisions. It consumes the next event sequence. The optional
+`agent` field is compatible with older version-1 events and recovery records;
+historical files are not rewritten. Admission itself does not append a new event.
+
+Unknown/invalid identifiers use a separate append-only store at
+`<logs_dir>/.authorization-rejections/<event_id>.json`. Each version-1 record
+contains only its event ID, UTC timestamp, fixed denial code, bounded/redacted
+agent, and SHA-256 digest of the attempted identifier. String IDs hash their exact
+UTF-8 bytes; invalid non-string JSON values use canonical JSON with a type prefix.
+Unsupported non-JSON identifiers fail closed. No mission snapshot or mission
+event stream is created for these rejections. A syntactically valid unknown ID
+may create a lock file; invalid IDs never become filesystem path components.
+
+Both evidence paths reuse immutable file publication and directory syncing.
+`AuthorizationDenied` carries a fixed code after evidence is durable. If locking,
+recovery, snapshot loading, or evidence persistence fails, `AuthorizationAuditError`
+blocks execution and chains the underlying exception without copying its text
+into evidence. An error after evidence publication can leave a record behind;
+repeated attempts are distinct denials and can produce multiple records.
+Orchestration propagates both authorization errors without marking a mission failed.
+
+No authorization helper receives the prompt. Denied calls create no run record
+and no prompt/output/exception payload is stored in denial evidence. Admitted and
+standalone calls retain the existing raw payload behavior. Recovery may complete
+a previously committed transition before a denial; the denial itself does not
+change lifecycle state. Existing redaction limitations still apply to identifiers.
+Evidence stores are unbounded local files, not an authentication system or
+tamper-proof audit trail. Admission does not cancel active calls or guarantee
+that an allowlisted agent is registered; registry resolution remains a later step.
+
 ## Engineering roadmap and autonomous mission queue
 
 From the repository root:

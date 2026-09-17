@@ -95,6 +95,7 @@ class GovernanceEvent:
     parent_mission_id: str | None = None
     child_mission_id: str | None = None
     recovery_digest: str = ""
+    agent: str | None = None
 
 
 def governance_history(root: Path, mission_id: str) -> tuple[GovernanceEvent, ...]:

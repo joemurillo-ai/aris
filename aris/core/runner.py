@@ -6,6 +6,7 @@ from typing import Optional
 from .agents import get_agent
 from .ledger import RunLedger
 from .llm import LLMResult
+from .authorization import authorize_call
 from aris.utils.logging import get_logger
 
 log = get_logger("aris.runner")
@@ -17,6 +18,8 @@ def run_agent(
     logs_dir: Path,
     mission_id: Optional[str] = None,
 ) -> str:
+    if mission_id is not None:
+        authorize_call(logs_dir, mission_id, agent_name)
     ledger = RunLedger(logs_dir)
 
     rec = ledger.start(

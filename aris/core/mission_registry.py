@@ -11,6 +11,7 @@ from typing import List, Optional
 import uuid
 
 from aris.core.mission import Mission
+from aris.core.authorization import AuthorizationDenied, denial_code, record_rejection
 from aris.core.governance import (
     GovernanceEvent, append_event, bounded, ensure_directory, governance_history,
     mission_lock, sync_directory, validate_id, write_json,
@@ -110,7 +111,7 @@ class MissionRegistry:
             # The intent was durable, but no event was published: no commit.
             self._clear_pending(mission_id)
             return
-        if json.loads(event_path.read_text()) != asdict(event):
+        if GovernanceEvent(**json.loads(event_path.read_text())) != event:
             raise ValueError("Recovery event does not match durable evidence")
         with ExitStack() as locks:
             for child_id in sorted({item["snapshot"]["mission_id"] for item in pending["snapshots"]} - {mission_id}):
@@ -128,6 +129,33 @@ class MissionRegistry:
         with mission_lock(self.root, mission_id):
             self._recover_locked(mission_id)
             return self.get(mission_id)
+
+    def _append_evidence_locked(self, mission: Mission, action: str,
+                                reason: str, agent_name: str) -> None:
+        """Non-mutating evidence only; caller owns the mission lock and recovery."""
+        event = GovernanceEvent(
+            schema_version=1, event_id=uuid.uuid4().hex, mission_id=mission.mission_id,
+            sequence=len(self.history(mission.mission_id)) + 1, action=action,
+            source_status=mission.status, destination_status=mission.status,
+            timestamp=datetime.now(timezone.utc).isoformat(timespec="microseconds"),
+            actor="system", reason=bounded(reason, 1024), agent=bounded(agent_name, 128),
+        )
+        append_event(self.root, event)
+
+    def authorize_agent(self, mission_id: str, agent_name: str) -> None:
+        """Admit one call under lock; never hold the lock during a handler call."""
+        with mission_lock(self.root, mission_id):
+            self._recover_locked(mission_id)
+            mission = self.get(mission_id)
+            if mission is None:
+                record_rejection(self.root.parent, mission_id, agent_name, "mission_unknown")
+                raise AuthorizationDenied("mission_unknown")
+            if mission.mission_id != mission_id:
+                raise ValueError("Mission snapshot identity mismatch")
+            code = denial_code(mission, agent_name)
+            if code is not None:
+                self._append_evidence_locked(mission, "authorization_denied", code, agent_name)
+                raise AuthorizationDenied(code)
 
     def mutate(self, mission_id: str, action: str, *, actor: str | None = "system",
                reason: str | None = None, expected_status: str | None = None,
