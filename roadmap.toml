@@ -40,7 +40,7 @@ title = "Persist append-only governance history"
 objective = "Record durable governance events alongside mission snapshots so repeated operator actions remain auditable."
 why_it_matters = "Mission snapshots currently overwrite actor/reason fields; event history must exist before expanding mutation entry points."
 priority = 30
-status = "in_review"
+status = "done"
 dependencies = ["lifecycle-validation", "privacy-redaction"]
 acceptance_criteria = [
   "Define a versioned event record with event ID, mission ID, action, source/destination status, time, actor, and bounded reason metadata.",
@@ -49,7 +49,7 @@ acceptance_criteria = [
   "Keep existing mission records readable and provide read-only event queries with deterministic ordering.",
 ]
 out_of_scope = ["Do not build distributed event sourcing, a new database service, or a web UI.", "Do not fabricate historical events from snapshots or store prompt/output payloads in governance events."]
-recommended_next_move = "Operator review: event-first governance persistence, locked mutations, idempotent recovery, and read-only history are implemented and independently approved. Review the verified local diff before committing or publishing."
+recommended_next_move = "Completed via PR #7: verified main commit 9a667153c9422e9e9d498e79d58b5acc79810436 contains the approved governance implementation. Select the next eligible mission only with operator authorization."
 
 [[missions]]
 id = "agent-authorization"
